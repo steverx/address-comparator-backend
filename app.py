@@ -16,29 +16,26 @@ DEFAULT_THRESHOLD = 80
 # --- Setup Flask App ---
 app = Flask(__name__)
 CORS(app, resources={r"/*": {
-    "origins": [
-        "https://address-comparator-frontend-production.up.railway.app",
-        "http://localhost:3000",
-        "*"
-    ], 
+    "origins": ["*"],
     "allow_headers": ["Content-Type", "Authorization", "Origin"],
     "methods": ["GET", "POST", "OPTIONS"]
 }})
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, 
+logging.basicConfig(level=logging.DEBUG, 
                     format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Add OPTIONS method handler for preflight requests
-@app.route('/columns', methods=['OPTIONS'])
-@app.route('/compare', methods=['OPTIONS'])
-def handle_options():
-    response = jsonify()
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Origin')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    return response
+@app.route('/columns', methods=['OPTIONS', 'POST'])
+def handle_columns():
+    if request.method == 'OPTIONS':
+        # Preflight request handling
+        response = jsonify()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Origin')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response
 
 def get_match_score(addr1, addr2):
     """Calculate match score using multiple metrics."""
