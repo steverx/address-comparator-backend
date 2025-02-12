@@ -12,6 +12,33 @@ from werkzeug.datastructures import FileStorage
 # Create logger instance
 logger = logging.getLogger(__name__)
 
+from flask import Flask, request, jsonify, send_file, make_response
+from flask_cors import CORS
+# ...existing imports...
+
+app = Flask(__name__)
+
+# Simplified CORS configuration
+CORS(app, 
+     origins=["https://address-comparator-frontend-production.up.railway.app"],
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "OPTIONS"],
+     supports_credentials=True,
+     expose_headers=["Content-Type"])
+
+# Add to app.py
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'healthy'}), 200
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'https://address-comparator-frontend-production.up.railway.app')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
+
 # Environment Configuration
 DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 PORT = int(os.environ.get('PORT', 8000))
@@ -22,19 +49,6 @@ ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS',
 ALLOWED_EXTENSIONS = {'.csv', '.xlsx'}
 DEFAULT_PARSER = 'usaddress'
 DEFAULT_THRESHOLD = 80
-
-# --- Setup Flask App ---
-app = Flask(__name__)
-
-# Updated CORS and production configuration
-CORS(app, 
-    resources={r"/*": {
-        "origins": ["https://address-comparator-frontend-production.up.railway.app"],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "Accept", "Origin"],
-        "supports_credentials": True,
-        "expose_headers": ["Content-Type"]
-    }})
 
 # Production configuration
 app.config['ENV'] = 'production'
