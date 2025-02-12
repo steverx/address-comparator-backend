@@ -15,10 +15,12 @@ DEFAULT_THRESHOLD = 80
 
 # --- Setup Flask App ---
 app = Flask(__name__)
+# In your Flask backend, modify the CORS configuration:
 CORS(app, resources={r"/*": {
-    "origins": ["*"],
+    "origins": ["https://address-comparator-frontend-production.up.railway.app"],  # Add your frontend domain
+    "methods": ["GET", "POST", "OPTIONS"],
     "allow_headers": ["Content-Type", "Authorization", "Origin"],
-    "methods": ["GET", "POST", "OPTIONS"]
+    "expose_headers": ["Content-Type", "Authorization"]
 }})
 
 # Configure logging
