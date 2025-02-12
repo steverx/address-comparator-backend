@@ -7,6 +7,16 @@ import io
 import logging
 import os
 import re
+from werkzeug.datastructures import FileStorage
+
+# Create logger instance
+logger = logging.getLogger(__name__)
+
+# Environment Configuration
+DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+PORT = int(os.environ.get('PORT', 8000))
+ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', 
+    'https://address-comparator-frontend-production.up.railway.app').split(',')
 
 # --- Constants ---
 ALLOWED_EXTENSIONS = {'.csv', '.xlsx'}
@@ -21,8 +31,9 @@ CORS(app,
     resources={r"/*": {
         "origins": ["https://address-comparator-frontend-production.up.railway.app"],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "Accept"],
-        "supports_credentials": True
+        "allow_headers": ["Content-Type", "Authorization", "Accept", "Origin"],
+        "supports_credentials": True,
+        "expose_headers": ["Content-Type"]
     }})
 
 # Production configuration
@@ -39,9 +50,15 @@ def handle_preflight():
         return response
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG, 
-                   format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# Update logging configuration
+logging.basicConfig(
+    level=logging.DEBUG if DEBUG else logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('app.log')
+    ]
+)
 
 # Error handling middleware
 @app.errorhandler(Exception)
@@ -49,13 +66,20 @@ def handle_error(error):
     logger.exception("Unhandled error")
     return jsonify({'error': str(error)}), 500
 
+@app.errorhandler(404)
+def not_found_error(error):
+    logger.error(f"Route not found: {request.url}")
+    return jsonify({'error': 'Resource not found'}), 404
+
+@app.errorhandler(400)
+def bad_request_error(error):
+    logger.error(f"Bad request: {str(error)}")
+    return jsonify({'error': str(error)}), 400
+
 # Add OPTIONS method handler for preflight requests
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'https://address-comparator-frontend-production.up.railway.app')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    return response
+    return response 
 
 def get_match_score(addr1, addr2):
     """Calculate match score using multiple metrics."""
@@ -260,6 +284,10 @@ def compare_addresses():
         logger.exception("Comprehensive error in compare_addresses")
         return jsonify({'error': str(e)}), 500
 
+# At the bottom of the file
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(
+        host='0.0.0.0',
+        port=PORT,
+        debug=DEBUG
+    )
