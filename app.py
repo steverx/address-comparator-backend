@@ -18,13 +18,16 @@ app = Flask(__name__)
 
 # Updated CORS configuration
 CORS(app, 
-     resources={r"/*": {
-         "origins": ["https://address-comparator-frontend-production.up.railway.app"],
-         "methods": ["GET", "POST", "OPTIONS"],
-         "allow_headers": ["Content-Type", "Authorization"],
-         "supports_credentials": True,
-         "expose_headers": ["Content-Type"]
-     }})
+     origins=["https://address-comparator-frontend-production.up.railway.app"],
+     methods=["GET", "POST", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization", "Accept"],
+     supports_credentials=True)
+
+# Add debug middleware
+@app.after_request
+def after_request(response):
+    print(f"Response Headers: {dict(response.headers)}")  # Debug print
+    return response
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, 
