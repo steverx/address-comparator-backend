@@ -16,18 +16,31 @@ DEFAULT_THRESHOLD = 80
 # --- Setup Flask App ---
 app = Flask(__name__)
 
-# Updated CORS configuration
 CORS(app, 
-     origins=["https://address-comparator-frontend-production.up.railway.app"],
-     methods=["GET", "POST", "OPTIONS"],
-     allow_headers=["Content-Type", "Authorization", "Accept"],
-     supports_credentials=True)
+    resources={r"/*": {
+        "origins": ["https://address-comparator-frontend-production.up.railway.app"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": [
+            "Content-Type",
+            "Authorization",
+            "Accept",
+            "Origin",
+            "Content-Length",
+            "Accept-Encoding",
+            "Accept-Language",
+            "User-Agent"
+        ],
+        "expose_headers": ["Content-Length", "Content-Type"]
+    }})
 
-# Add debug middleware
-@app.after_request
-def after_request(response):
-    print(f"Response Headers: {dict(response.headers)}")  # Debug print
-    return response
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers["Access-Control-Allow-Origin"] = "https://address-comparator-frontend-production.up.railway.app"
+        response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept"
+        return response
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, 
