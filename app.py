@@ -125,26 +125,36 @@ def get_columns():
         logger.info("Columns request received")
         logger.info(f"Request files: {request.files}")
         
+        # Explicitly set CORS headers
+        response = jsonify({'error': 'Missing file'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        
         if 'file' not in request.files:
             logger.error("No file in request")
-            return jsonify({'error': 'Missing file'}), 400
+            return response, 400
             
         file = request.files['file']
         logger.info(f"Received file: {file.filename}")
         
         if not file or not allowed_file(file.filename):
             logger.error(f"Invalid file type: {file.filename}")
-            return jsonify({'error': 'Invalid file type'}), 400
+            response = jsonify({'error': 'Invalid file type'})
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 400
             
         df = load_dataframe(file)
         columns = df.columns.tolist()
         logger.info(f"Columns found: {columns}")
         
-        return jsonify({'columns': columns}), 200
+        response = jsonify({'columns': columns})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 200
         
     except Exception as e:
         logger.exception("Error processing columns request")
-        return jsonify({'error': str(e)}), 500
+        response = jsonify({'error': str(e)})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
 
 @app.route('/compare', methods=['POST'])
 def compare_addresses():
