@@ -7,6 +7,7 @@ import io
 import logging
 import os
 import re
+import datetime
 from werkzeug.datastructures import FileStorage
 from typing import Dict, List, Optional, Union
 
@@ -42,7 +43,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Update CORS configuration
+# CORS configuration
 CORS(app, 
     resources={r"/*": {
         "origins": ALLOWED_ORIGINS,
@@ -51,6 +52,23 @@ CORS(app,
         "supports_credentials": True,
         "expose_headers": ["Content-Type"]
     }})
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for Railway deployment."""
+    try:
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.datetime.utcnow().isoformat(),
+            'env': app.config.get('ENV'),
+            'debug': app.config.get('DEBUG')
+        }), 200
+    except Exception as e:
+        logger.exception("Health check failed")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e)
+        }), 500
 
 def get_match_score(addr1: str, addr2: str) -> float:
     """Calculate match score using multiple metrics."""

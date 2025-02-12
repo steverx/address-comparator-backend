@@ -24,5 +24,5 @@ ENV PORT=8000
 
 EXPOSE $PORT
 
-# Remove healthcheck from Dockerfile as Railway handles it
+# Start command
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app", "--workers", "4", "--timeout", "120", "--log-level", "info"]
