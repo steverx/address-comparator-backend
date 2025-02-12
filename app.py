@@ -15,18 +15,24 @@ DEFAULT_THRESHOLD = 80
 
 # --- Setup Flask App ---
 app = Flask(__name__)
-# In your Flask backend, modify the CORS configuration:
-CORS(app, resources={r"/*": {
-    "origins": ["https://address-comparator-frontend-production.up.railway.app"],  # Add your frontend domain
-    "methods": ["GET", "POST", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization", "Origin"],
-    "expose_headers": ["Content-Type", "Authorization"]
-}})
+
+# Updated CORS configuration
+CORS(app, 
+     origins=["https://address-comparator-frontend-production.up.railway.app"],
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "Origin"],
+     methods=["GET", "POST", "OPTIONS"])
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, 
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+                   format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Error handling middleware
+@app.errorhandler(Exception)
+def handle_error(error):
+    logger.exception("Unhandled error")
+    return jsonify({'error': str(error)}), 500
 
 # Add OPTIONS method handler for preflight requests
 @app.after_request
@@ -99,11 +105,9 @@ def combine_address_components(row, columns, is_excel=False):
     """Combine address components."""
     components = []
     
-    # Remove duplicate columns for Excel files
     if is_excel and any(col.endswith('1') for col in columns):
         columns = [col for col in columns if not col.endswith('1')]
     
-    # Process address components
     for col in columns:
         if pd.notna(row[col]):
             val = str(row[col]).strip()
@@ -112,51 +116,38 @@ def combine_address_components(row, columns, is_excel=False):
     
     return ', '.join(components) if components else ''
 
-# --- Routes ---
 @app.route('/columns', methods=['POST'])
 def get_columns():
     """Handle column name requests."""
     try:
-        # Log incoming request details
         logger.info("Columns request received")
         logger.info(f"Request files: {request.files}")
         
-        # Explicitly set CORS headers
-        response = jsonify({'error': 'Missing file'})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        
         if 'file' not in request.files:
             logger.error("No file in request")
-            return response, 400
+            return jsonify({'error': 'Missing file'}), 400
             
         file = request.files['file']
         logger.info(f"Received file: {file.filename}")
         
         if not file or not allowed_file(file.filename):
             logger.error(f"Invalid file type: {file.filename}")
-            response = jsonify({'error': 'Invalid file type'})
-            response.headers.add('Access-Control-Allow-Origin', '*')
-            return response, 400
+            return jsonify({'error': 'Invalid file type'}), 400
             
         df = load_dataframe(file)
         columns = df.columns.tolist()
         logger.info(f"Columns found: {columns}")
         
-        response = jsonify({'columns': columns})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response, 200
+        return jsonify({'columns': columns}), 200
         
     except Exception as e:
         logger.exception("Error processing columns request")
-        response = jsonify({'error': str(e)})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response, 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/compare', methods=['POST'])
 def compare_addresses():
     """Handle address comparison requests."""
     try:
-        # Validate inputs
         file1 = request.files.get('file1')
         file2 = request.files.get('file2')
         if not file1 or not file2:
@@ -173,16 +164,13 @@ def compare_addresses():
         if not address_columns1 or not address_columns2:
             return jsonify({'error': 'No address columns selected'}), 400
             
-        # Load and process files
         df1 = load_dataframe(file1)
         df2 = load_dataframe(file2)
         
-        # Process addresses
         results = []
         is_excel1 = file1.filename.endswith('.xlsx')
         is_excel2 = file2.filename.endswith('.xlsx')
         
-        # Process first file
         addresses1 = []
         for _, row in df1.iterrows():
             addr = combine_address_components(row, address_columns1, is_excel1)
@@ -198,7 +186,6 @@ def compare_addresses():
                 except Exception as e:
                     logger.error(f"Error processing address in file1: {addr}. Error: {str(e)}")
         
-        # Process second file
         addresses2 = []
         for _, row in df2.iterrows():
             addr = combine_address_components(row, address_columns2, is_excel2)
@@ -217,7 +204,6 @@ def compare_addresses():
         logger.info(f"Processed {len(addresses1)} addresses from file1")
         logger.info(f"Processed {len(addresses2)} addresses from file2")
         
-        # Find matches
         for addr1 in addresses1:
             best_match = None
             best_score = 0
@@ -237,18 +223,13 @@ def compare_addresses():
                     'parsing_confidence': round(avg_confidence, 2)
                 })
         
-        # Handle export request
         if request.form.get('export') == 'true':
             output = io.BytesIO()
             if results:
                 df_results = pd.DataFrame(results)
-                
-                # Use openpyxl engine
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     df_results.to_excel(writer, sheet_name='Address Matches', index=False)
-                
                 output.seek(0)
-                
                 return send_file(
                     output,
                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
