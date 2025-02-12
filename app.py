@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, make_response
 from flask_cors import CORS
 import pandas as pd
 from fuzzywuzzy import fuzz
@@ -16,22 +16,18 @@ DEFAULT_THRESHOLD = 80
 # --- Setup Flask App ---
 app = Flask(__name__)
 
+# Updated CORS and production configuration
 CORS(app, 
     resources={r"/*": {
         "origins": ["https://address-comparator-frontend-production.up.railway.app"],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": [
-            "Content-Type",
-            "Authorization",
-            "Accept",
-            "Origin",
-            "Content-Length",
-            "Accept-Encoding",
-            "Accept-Language",
-            "User-Agent"
-        ],
-        "expose_headers": ["Content-Length", "Content-Type"]
+        "allow_headers": ["Content-Type", "Authorization", "Accept"],
+        "supports_credentials": True
     }})
+
+# Production configuration
+app.config['ENV'] = 'production'
+app.config['DEBUG'] = False
 
 @app.before_request
 def handle_preflight():
@@ -265,4 +261,5 @@ def compare_addresses():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port)
