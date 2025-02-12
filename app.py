@@ -9,6 +9,7 @@ import os
 import re
 import datetime
 import gc
+import sys
 from werkzeug.datastructures import FileStorage
 from typing import Dict, List, Optional, Union, Generator
 from waitress import serve
@@ -113,12 +114,22 @@ def validate_file(file: FileStorage) -> bool:
     
     return True
 
-@app.route('/')
+@app.route('/health')
 def health_check():
     """Health check endpoint for Railway."""
+    logger.info("Health check request received")
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.datetime.utcnow().isoformat()
+    }), 200
+
+@app.route('/')
+def root():
+    """Root endpoint."""
+    return jsonify({
+        'message': 'Address Comparison API',
+        'version': '1.0',
+        'status': 'running'
     }), 200
 
 @app.before_request
@@ -315,20 +326,35 @@ def handle_error(error):
     return jsonify({'error': str(error)}), 500
 
 if __name__ == '__main__':
-    logger.info(f"Starting server on port {PORT}")
-    logger.info(f"Debug mode: {DEBUG}")
-    logger.info(f"Allowed origins: {ALLOWED_ORIGINS}")
-    
-    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
-        logger.info("Starting production server with Waitress")
-        serve(app,
-              host='0.0.0.0', 
-              port=PORT, 
-              threads=8,
-              connection_limit=1000,
-              channel_timeout=600,
-              cleanup_interval=30,
-              url_scheme='https')
-    else:
-        logger.info("Starting development server")
-        app.run(host='0.0.0.0', port=PORT, debug=DEBUG)
+    try:
+        logger.info("=== Starting Address Comparison API ===")
+        logger.info(f"Port: {PORT}")
+        logger.info(f"Debug mode: {DEBUG}")
+        logger.info(f"Allowed origins: {ALLOWED_ORIGINS}")
+        logger.info(f"Process ID: {os.getpid()}")
+        logger.info(f"Working directory: {os.getcwd()}")
+        logger.info(f"Python version: {sys.version}")
+        
+        # Log environment variables (excluding sensitive ones)
+        safe_env_vars = {k: v for k, v in os.environ.items() 
+                        if not any(sensitive in k.lower() 
+                                 for sensitive in ['key', 'secret', 'password', 'token'])}
+        logger.info(f"Environment variables: {safe_env_vars}")
+        
+        if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
+            logger.info("Starting production server with Waitress")
+            serve(app,
+                  host='0.0.0.0', 
+                  port=PORT, 
+                  threads=4,  # Reduced from 8 for initial testing
+                  connection_limit=1000,
+                  channel_timeout=30,  # Reduced from 600 for faster health checks
+                  cleanup_interval=30,
+                  url_scheme='https')
+        else:
+            logger.info("Starting development server")
+            app.run(host='0.0.0.0', port=PORT, debug=DEBUG)
+            
+    except Exception as e:
+        logger.error(f"Failed to start server: {str(e)}", exc_info=True)
+        sys.exit(1)
