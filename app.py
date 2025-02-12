@@ -10,6 +10,7 @@ import re
 import datetime
 from werkzeug.datastructures import FileStorage
 from typing import Dict, List, Optional, Union
+from waitress import serve 
 
 # Environment Configuration
 DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
@@ -34,12 +35,9 @@ app.config.update(
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG if DEBUG else logging.INFO,
+    level=logging.INFO,  # Simplified logging level
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('app.log')
-    ]
+    handlers=[logging.StreamHandler()]  # Remove file handler for Railway
 )
 logger = logging.getLogger(__name__)
 
@@ -49,26 +47,13 @@ CORS(app,
         "origins": ALLOWED_ORIGINS,
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "Accept", "Origin"],
-        "supports_credentials": True,
-        "expose_headers": ["Content-Type"]
+        "supports_credentials": True
     }})
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint for Railway deployment."""
-    try:
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': datetime.datetime.utcnow().isoformat(),
-            'env': app.config.get('ENV'),
-            'debug': app.config.get('DEBUG')
-        }), 200
-    except Exception as e:
-        logger.exception("Health check failed")
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e)
-        }), 500
+    """Simple health check endpoint."""
+    return jsonify({'status': 'healthy'}), 200
 
 def get_match_score(addr1: str, addr2: str) -> float:
     """Calculate match score using multiple metrics."""
@@ -317,8 +302,9 @@ if __name__ == '__main__':
     logger.info(f"Debug mode: {DEBUG}")
     logger.info(f"Allowed origins: {ALLOWED_ORIGINS}")
     
-    app.run(
-        host='0.0.0.0',
-        port=PORT,
-        debug=DEBUG
-    )
+    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
+        logger.info("Starting production server with Waitress")
+        serve(app, host='0.0.0.0', port=PORT, threads=4)
+    else:
+        logger.info("Starting development server")
+        app.run(host='0.0.0.0', port=PORT, debug=DEBUG)
