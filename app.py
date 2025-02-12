@@ -21,11 +21,9 @@ CORS(app, resources={r"/*": {
     "methods": ["GET", "POST", "OPTIONS"]
 }})
 
-# --- Configure Logging ---
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+# Configure logging
+logging.basicConfig(level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Add OPTIONS method handler for preflight requests
@@ -119,15 +117,26 @@ def combine_address_components(row, columns, is_excel=False):
 def get_columns():
     """Handle column name requests."""
     try:
+        # Log incoming request details
+        logger.info("Columns request received")
+        logger.info(f"Request files: {request.files}")
+        
         if 'file' not in request.files:
+            logger.error("No file in request")
             return jsonify({'error': 'Missing file'}), 400
             
         file = request.files['file']
+        logger.info(f"Received file: {file.filename}")
+        
         if not file or not allowed_file(file.filename):
+            logger.error(f"Invalid file type: {file.filename}")
             return jsonify({'error': 'Invalid file type'}), 400
             
         df = load_dataframe(file)
-        return jsonify({'columns': df.columns.tolist()}), 200
+        columns = df.columns.tolist()
+        logger.info(f"Columns found: {columns}")
+        
+        return jsonify({'columns': columns}), 200
         
     except Exception as e:
         logger.exception("Error processing columns request")
