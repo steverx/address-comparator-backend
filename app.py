@@ -16,8 +16,12 @@ DEFAULT_THRESHOLD = 80
 # --- Setup Flask App ---
 app = Flask(__name__)
 CORS(app, resources={r"/*": {
-    "origins": "*", 
-    "allow_headers": ["Content-Type", "Authorization"],
+    "origins": [
+        "https://address-comparator-frontend-production.up.railway.app",
+        "http://localhost:3000",
+        "*"
+    ], 
+    "allow_headers": ["Content-Type", "Authorization", "Origin"],
     "methods": ["GET", "POST", "OPTIONS"]
 }})
 
@@ -32,7 +36,7 @@ logger = logging.getLogger(__name__)
 def handle_options():
     response = jsonify()
     response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Origin')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
 
