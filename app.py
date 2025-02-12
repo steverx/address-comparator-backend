@@ -29,15 +29,12 @@ logging.basicConfig(level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 
 # Add OPTIONS method handler for preflight requests
-@app.route('/columns', methods=['OPTIONS', 'POST'])
-def handle_columns():
-    if request.method == 'OPTIONS':
-        # Preflight request handling
-        response = jsonify()
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Origin')
-        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
-        return response
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'https://address-comparator-frontend-production.up.railway.app')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 def get_match_score(addr1, addr2):
     """Calculate match score using multiple metrics."""
