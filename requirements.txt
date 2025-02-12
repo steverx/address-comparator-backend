@@ -6,3 +6,10 @@ python-Levenshtein
 usaddress
 pyap
 xlsxwriter
+scikit-learn
+jellyfish
+pandas
+flask
+flask-cors
+fuzzywuzzy
+usaddress
