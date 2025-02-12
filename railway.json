@@ -5,16 +5,11 @@
       "dockerfilePath": "Dockerfile"
     },
     "deploy": {
-      "startCommand": "gunicorn --bind 0.0.0.0:$PORT app:app --workers 4 --timeout 120 --log-level info",
+      "startCommand": "/usr/local/bin/gunicorn -c gunicorn.conf.py app:app",
       "healthcheckPath": "/health",
       "healthcheckTimeout": 300,
       "restartPolicyType": "ON_FAILURE",
       "restartPolicyMaxRetries": 5,
-      "numReplicas": 1,
-      "env": {
-        "FLASK_ENV": "production",
-        "FLASK_DEBUG": "0",
-        "PYTHONUNBUFFERED": "1"
-      }
+      "numReplicas": 1
     }
-  }
+}
