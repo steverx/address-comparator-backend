@@ -5,9 +5,10 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# Copy requirements first
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -17,10 +18,15 @@ COPY . .
 # Set environment variables
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
+ENV FLASK_DEBUG=0
 ENV PYTHONUNBUFFERED=1
 
 # Expose port
 EXPOSE 8000
 
-# Start Gunicorn
-CMD gunicorn --bind 0.0.0.0:$PORT app:app --log-level debug --timeout 120
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Start command
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app", "--workers", "4", "--timeout", "120", "--log-level", "info"]
