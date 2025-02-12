@@ -24,13 +24,13 @@ ordered-set==4.1.0
 packaging==24.2
 pandas==2.0.3
 probableparsing==0.0.1
-psutil==6.1.1
+psutil==5.9.5
 pyap==0.3.1
 Pygments==2.19.1
 python-crfsuite==0.9.11
-python-dateutil==2.9.0
+python-dateutil==2.8.2
 python-Levenshtein==0.21.1
-pytz==2025.1
+pytz==2024.1
 RapidFuzz==3.12.1
 rich==13.9.4
 scikit-learn==1.3.0
@@ -38,7 +38,7 @@ scipy==1.13.1
 six==1.17.0
 threadpoolctl==3.5.0
 typing_extensions==4.12.2
-tzdata==2025.1
+tzdata==2024.1
 usaddress==0.5.10
 waitress==3.0.2
 Werkzeug==2.3.7
