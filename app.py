@@ -113,6 +113,14 @@ def validate_file(file: FileStorage) -> bool:
     
     return True
 
+@app.route('/')
+def health_check():
+    """Health check endpoint for Railway."""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.datetime.utcnow().isoformat()
+    }), 200
+
 @app.before_request
 def log_request_info():
     """Log request details for debugging."""
