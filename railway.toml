@@ -1,0 +1,14 @@
+[build]
+builder = "DOCKERFILE"
+dockerfile = "Dockerfile"
+
+[deploy]
+healthcheck = "/health"
+healthcheckTimeout = 100
+restartPolicy = "ON_FAILURE"
+numReplicas = 1
+
+[[services]]
+name = "app"
+ports = [8000]
+protocol = "http"
