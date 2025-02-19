@@ -11,13 +11,20 @@ COPY app.py .
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
+ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 ENV RAILWAY_ENVIRONMENT=production
 ENV FLASK_DEBUG=0
-ENV GUNICORN_CMD_ARGS="--bind 0.0.0.0:8000 --workers 4 --timeout 120 --log-level debug --access-logfile - --error-logfile - --capture-output"
 
 # Make the port available
 EXPOSE 8000
 
-# Start command with explicit bind address
-CMD gunicorn --bind "0.0.0.0:${PORT}" app:create_app()
+# Start command with explicit bind
+CMD exec gunicorn --bind "0.0.0.0:$PORT" \
+    --workers 4 \
+    --timeout 120 \
+    --log-level debug \
+    --access-logfile - \
+    --error-logfile - \
+    --capture-output \
+    "app:create_app()"
