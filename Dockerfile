@@ -1,24 +1,30 @@
-FROM node:18-alpine
+FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install dependencies for node-gyp
-RUN apk add --no-cache python3 make g++
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci
+# Install minimal required packages
+RUN pip install flask==3.1.0 gunicorn==23.0.0 psutil==7.0.0
 
 # Copy application code
-COPY . .
+COPY app.py .
 
-# Build the React application
-RUN npm run build
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
+ENV FLASK_APP=app.py
+ENV FLASK_ENV=production
+ENV RAILWAY_ENVIRONMENT=production
+ENV FLASK_DEBUG=0
 
-# Expose the port
-EXPOSE 3000
+# Make the port available
+EXPOSE 8000
 
-# Start the Express server
-CMD ["node", "server.js"]
+# Start command with explicit bind
+CMD exec gunicorn --bind "0.0.0.0:$PORT" \
+    --workers 4 \
+    --timeout 120 \
+    --log-level debug \
+    --access-logfile - \
+    --error-logfile - \
+    --capture-output \
+    "app:create_app()"
