@@ -24,8 +24,11 @@ ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
 
+# Health check
+HEALTHCHECK --interval=15s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:$PORT/health || exit 1
+
 # Expose the port
 EXPOSE 8000
 
-# Run the application using waitress
 CMD ["python", "app.py"]

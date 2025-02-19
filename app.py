@@ -114,14 +114,27 @@ def validate_file(file: FileStorage) -> bool:
     
     return True
 
-@app.route('/health')
+@app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint for Railway."""
-    logger.info("Health check request received")
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.datetime.utcnow().isoformat()
-    }), 200
+    try:
+        memory = psutil.virtual_memory()
+        health_data = {
+            'status': 'healthy',
+            'timestamp': datetime.datetime.utcnow().isoformat(),
+            'memory_usage': f"{memory.percent}%",
+            'pid': os.getpid(),
+            'uptime': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        logger.info(f"Health check passed: {health_data}")
+        return jsonify(health_data), 200
+    except Exception as e:
+        logger.exception("Health check failed")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.datetime.utcnow().isoformat()
+        }), 500
 
 @app.route('/')
 def root():
