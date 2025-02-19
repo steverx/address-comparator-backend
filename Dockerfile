@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make port 8000 available to the world outside this container
+# Make port 8000 available
 EXPOSE 8000
 
 # Set environment variables
@@ -23,5 +23,5 @@ ENV PORT=8000
 ENV FLASK_APP=app.py
 ENV RAILWAY_ENVIRONMENT=production
 
-# Run the application
-CMD ["python", "app.py"]
+# Start Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-", "app:create_app()"]
