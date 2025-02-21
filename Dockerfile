@@ -15,28 +15,20 @@ RUN apt-get update && \
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 
-# Upgrade pip and install dependencies
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
-ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
-ENV RAILWAY_ENVIRONMENT=production
+ENV PYTHONUNBUFFERED=1
 
-# Make the port available
+# Expose the port
 EXPOSE 8080
 
-# Start command
-CMD exec gunicorn --bind 0.0.0.0:$PORT \
-    --workers 4 \
-    --threads 8 \
-    --timeout 0 \
-    --preload \
-    --worker-class=gthread \
-    "app:create_app()"
+# Start Gunicorn
+ENTRYPOINT ["gunicorn"]
+CMD ["--workers=4", "--bind", "0.0.0.0:8080", "wsgi:application"]

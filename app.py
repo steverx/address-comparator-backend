@@ -356,11 +356,13 @@ def create_app():
        raise
 
 if __name__ == '__main__':
-   try:
-       port = int(os.environ.get('PORT', 8080))
-       logger.info(f"Starting development server on port {port}")
-       app = create_app()
-       app.run(host='0.0.0.0', port=port)
-   except Exception as e:
-       logger.error(f"Failed to start development server: {str(e)}", exc_info=True)
-       sys.exit(1)
+    try:
+        # In development, this will run the Flask dev server
+        # In production, Gunicorn will import create_app() directly
+        app = create_app()
+        if os.environ.get('FLASK_ENV') == 'development':
+            port = int(os.environ.get('PORT', 8080))
+            app.run(host='0.0.0.0', port=port, debug=True)
+    except Exception as e:
+        logger.error(f"Failed to start server: {str(e)}", exc_info=True)
+        sys.exit(1)
