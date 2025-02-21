@@ -10,5 +10,5 @@ numReplicas = 1
 
 [[services]]
 name = "app"
-ports = [8000]
+ports = [8080]  # Changed from 8000 to 8080
 protocol = "http"
