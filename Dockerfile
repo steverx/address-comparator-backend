@@ -27,15 +27,20 @@ ENV PORT=8080
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 
-# Create start script
+# Create start script with enhanced logging
 RUN echo '#!/bin/bash\n\
-gunicorn --bind 0.0.0.0:$PORT \
+echo "Starting Gunicorn server..."\n\
+echo "Current directory: $(pwd)"\n\
+echo "Python path: $(which python)"\n\
+echo "Files in current directory: $(ls -la)"\n\
+exec gunicorn --bind 0.0.0.0:$PORT \
 --workers 4 \
 --threads 8 \
 --timeout 0 \
 --log-level debug \
 --access-logfile - \
 --error-logfile - \
+--preload \
 wsgi:application' > start.sh && \
 chmod +x start.sh
 

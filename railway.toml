@@ -12,3 +12,7 @@ numReplicas = 1
 name = "app"
 ports = [8080]
 protocol = "http"
+
+[metrics]
+port = 8080
+path = "/health"
