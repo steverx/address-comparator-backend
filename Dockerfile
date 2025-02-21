@@ -15,8 +15,9 @@ RUN apt-get update && \
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies and explicitly install gunicorn
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install gunicorn==21.2.0
 
 # Copy application code
 COPY . .
@@ -26,9 +27,20 @@ ENV PORT=8080
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 
+# Create start script
+RUN echo '#!/bin/bash\n\
+gunicorn --bind 0.0.0.0:$PORT \
+--workers 4 \
+--threads 8 \
+--timeout 0 \
+--log-level debug \
+--access-logfile - \
+--error-logfile - \
+wsgi:application' > start.sh && \
+chmod +x start.sh
+
 # Expose the port
 EXPOSE 8080
 
-# Start Gunicorn
-ENTRYPOINT ["gunicorn"]
-CMD ["--workers=4", "--bind", "0.0.0.0:8080", "wsgi:application"]
+# Run the start script
+CMD ["./start.sh"]
