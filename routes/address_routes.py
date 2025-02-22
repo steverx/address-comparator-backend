@@ -1,7 +1,9 @@
 from flask import Blueprint, request, jsonify, send_file
-from utils.address_utils import AddressCorrectionModel
+from utils.address_utils import AddressCorrectionModel  # Import your model
 from utils.data_processing import DataProcessor  # Import DataProcessor
 from utils.progress import progress_tracker
+from utils.column_utils import identify_address_columns, get_column_preview  # Import new utils
+from config.excel_config import EXCEL_CONFIG, ADDRESS_KEYWORDS # Import Config
 import pandas as pd
 import io
 import logging
@@ -15,17 +17,17 @@ import psutil
 
 
 address_bp = Blueprint('address_bp', __name__)
-# address_model = AddressCorrectionModel()  # Don't initialize here; do it in DataProcessor
+# address_model = AddressCorrectionModel()  # No longer needed here - handled by DataProcessor
 DEFAULT_THRESHOLD = 80
-CHUNK_SIZE = 10000
+CHUNK_SIZE = 10000  # This should now be handled in DataProcessor and config
 logger = logging.getLogger(__name__)
-data_processor = DataProcessor()  # Initialize DataProcessor *here*
+data_processor = DataProcessor()  # Use default chunk size from config, model handled within DataProcessor
 
 
 # -- Helper functions (moved into routes file and simplified)--
 def allowed_file(filename: str) -> bool:
-    ALLOWED_EXTENSIONS = {'.csv', '.xlsx'}
-    return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
+    # Use the config for allowed extensions
+    return os.path.splitext(filename)[1].lower() in EXCEL_CONFIG['supported_extensions']
 
 def validate_request_files(request_files):
     """Validate uploaded files."""
@@ -62,21 +64,38 @@ def validate_comparison_results(results: List[Dict]) -> bool:
 # -- Routes --
 @address_bp.route('/columns', methods=['POST'])
 def get_columns():
-    """Handle column name requests."""
+    """Get columns from uploaded file and identify potential address fields."""
     try:
         if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
+            return jsonify({
+                'status': 'error',
+                'error': 'No file provided'
+            }), 400
+
         file = request.files['file']
         if not file or not allowed_file(file.filename):
             return jsonify({'error': 'Invalid file type'}), 400
 
-        # Use DataProcessor to load the file.  No validation needed here.
-        df = data_processor.load_and_validate_file(file, file.filename) # Pass filename for validation
-        columns = df.columns.tolist()
-        return jsonify({'status': 'success', 'data': columns}), 200
+
+        # Read only the first few rows for column detection and suggestion
+        df = pd.read_csv(file, nrows=5) if file.filename.endswith('.csv') else pd.read_excel(file, nrows=5, engine='openpyxl')
+        # Get all columns and identify potential address columns
+        all_columns = df.columns.tolist()
+        address_columns = identify_address_columns(df, ADDRESS_KEYWORDS)
+
+        # Return *both* all columns and suggested address columns
+        return jsonify({
+            'status': 'success',
+            'data': all_columns,  # All column names
+            'suggested_address_columns': address_columns  # Suggested address columns
+        }), 200
+
     except Exception as e:
-        logger.exception("Error processing columns")
-        return jsonify({'status': 'error', 'error': str(e)}), 500
+        logger.exception("Error processing file columns")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
 
 @address_bp.route('/compare', methods=['POST'])
@@ -142,7 +161,7 @@ def compare_addresses():
         # Return JSON response
         response_data = {
             'status': 'success',
-            'job_id': job_id,
+            'job_id': job_id,  # Return the job ID
             'data': results,
             'metadata': {
                 'file1_rows': len(df1),

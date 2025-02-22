@@ -6,15 +6,17 @@ import logging
 import gc
 from utils.address_utils import AddressCorrectionModel
 from utils.progress import progress_tracker
+from config.excel_config import EXCEL_CONFIG, ADDRESS_KEYWORDS  # Import config
+import os  # Import os
 
 logger = logging.getLogger(__name__)
 
 class DataProcessor:
     def __init__(self,
-                 chunk_size: int = 10000,
+                 chunk_size: int = 10000,  # Use config, but keep default
                  max_workers: int = 4,
                  address_model: Optional[AddressCorrectionModel] = None):
-        self.chunk_size = chunk_size
+        self.chunk_size = chunk_size  # Or:  self.chunk_size = chunk_size if chunk_size else EXCEL_CONFIG['chunk_size']
         self.max_workers = max_workers  # Number of threads
         self.address_model = address_model or AddressCorrectionModel() # Use provided model or create one
 
@@ -25,7 +27,7 @@ class DataProcessor:
         total_chunks = (len(df) + self.chunk_size - 1) // self.chunk_size
 
         for chunk_num, i in enumerate(range(0, len(df), self.chunk_size)):
-            chunk = df.iloc[i:i + self.chunk_size].copy()  # Create a copy to avoid SettingWithCopyWarning
+            chunk = df.iloc[i:i + self.chunk_size].copy()  # Create a copy
 
             if job_id:
                 progress = (chunk_num + 1) / total_chunks * 100
@@ -38,7 +40,7 @@ class DataProcessor:
 
             yield chunk
 
-            # Clean up memory after yielding chunk
+            # Clean up memory
             del chunk
             gc.collect()
 
@@ -46,8 +48,8 @@ class DataProcessor:
                            df: pd.DataFrame,
                            address_columns: List[str]) -> pd.DataFrame:
         """Preprocess addresses for comparison."""
-        # Combine, handling missing columns gracefully
-        df['combined_address'] = ""  # Initialize in case no columns are valid
+        # Combine, handling missing columns
+        df['combined_address'] = ""  # Initialize
         valid_columns = [col for col in address_columns if col in df.columns] # Only existing columns
         if valid_columns:
             df['combined_address'] = df[valid_columns].fillna('').astype(str).agg(', '.join, axis=1)
@@ -67,7 +69,6 @@ class DataProcessor:
         # Preprocessing *inside* process_chunk (but on the entire df2 only once).
         chunk_df1 = self.preprocess_addresses(chunk_df1, columns1)
         # Only preprocess df2 *once*, outside the inner loop
-        # The check here now makes more sense, as df2 is always the "full" df2.
         if not hasattr(df2, 'normalized_address'):
            df2 = self.preprocess_addresses(df2, columns2)
 
@@ -75,7 +76,7 @@ class DataProcessor:
             futures = []
             for _, row1 in chunk_df1.iterrows():
                 future = executor.submit(
-                    self._find_best_match,  # Submit the task
+                    self._find_best_match,
                     row1,
                     df2,
                     threshold
@@ -83,13 +84,13 @@ class DataProcessor:
                 futures.append(future)
 
             results = []
-            for future in as_completed(futures):  # Iterate as they complete
+            for future in as_completed(futures):
                 try:
-                    match = future.result()  # Get the result (or exception)
+                    match = future.result()
                     if match:
                         results.append(match)
                 except Exception as e:
-                    logger.error(f"Error processing match: {e}") # Log individual errors, continue
+                    logger.error(f"Error processing match: {e}")
 
         return results
 
@@ -109,23 +110,23 @@ class DataProcessor:
             )
 
             # Find the index of the best score.
-            best_idx = scores.idxmax()  # Use idxmax for index of max value
-            best_score = scores.loc[best_idx] # Get score using the index
+            best_idx = scores.idxmax()
+            best_score = scores.loc[best_idx]
 
             if best_score > threshold:
                 return {
                     'source_address': row1['combined_address'],
                     'normalized_source': row1['normalized_address'],
-                    'matched_address': df2.loc[best_idx]['combined_address'],  # Access by index
+                    'matched_address': df2.loc[best_idx]['combined_address'],
                     'normalized_match': df2.loc[best_idx]['normalized_address'],
-                    'match_score': float(best_score)  # Ensure float
+                    'match_score': float(best_score)
                 }
 
-            return None  # Explicitly return None if no match
+            return None
 
         except Exception as e:
             logger.error(f"Error finding best match: {e}")
-            return None # Return None on error
+            return None
 
     def load_and_validate_file(self, file, file_key: str) -> pd.DataFrame:
         """Loads and validates an uploaded file."""
@@ -142,7 +143,7 @@ class DataProcessor:
                 df = pd.read_csv(file)
             elif file_ext == '.xlsx':
                 df = pd.read_excel(file, engine='openpyxl')
-            else:  # Should never get here because of the extension check above
+            else:  # Should never get here
                 raise ValueError(f"Unsupported file type: {file.filename}")
             return df
 
