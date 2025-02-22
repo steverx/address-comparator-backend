@@ -10,23 +10,23 @@ from utils.progress import progress_tracker
 logger = logging.getLogger(__name__)
 
 class DataProcessor:
-    def __init__(self, 
+    def __init__(self,
                  chunk_size: int = 10000,
                  max_workers: int = 4,
                  address_model: Optional[AddressCorrectionModel] = None):
         self.chunk_size = chunk_size
-        self.max_workers = max_workers
-        self.address_model = address_model or AddressCorrectionModel()
-    
-    def process_dataframe_in_chunks(self, 
-                                  df: pd.DataFrame, 
+        self.max_workers = max_workers  # Number of threads
+        self.address_model = address_model or AddressCorrectionModel() # Use provided model or create one
+
+    def process_dataframe_in_chunks(self,
+                                  df: pd.DataFrame,
                                   job_id: str = None) -> Generator[pd.DataFrame, None, None]:
         """Process dataframe in chunks with progress tracking."""
         total_chunks = (len(df) + self.chunk_size - 1) // self.chunk_size
-        
+
         for chunk_num, i in enumerate(range(0, len(df), self.chunk_size)):
-            chunk = df.iloc[i:i + self.chunk_size].copy()
-            
+            chunk = df.iloc[i:i + self.chunk_size].copy()  # Create a copy to avoid SettingWithCopyWarning
+
             if job_id:
                 progress = (chunk_num + 1) / total_chunks * 100
                 progress_tracker.update_progress(job_id, {
@@ -35,81 +35,117 @@ class DataProcessor:
                     'current_chunk': chunk_num + 1,
                     'total_chunks': total_chunks
                 })
-            
+
             yield chunk
-            
+
             # Clean up memory after yielding chunk
             del chunk
             gc.collect()
-    
-    def preprocess_addresses(self, 
-                           df: pd.DataFrame, 
+
+    def preprocess_addresses(self,
+                           df: pd.DataFrame,
                            address_columns: List[str]) -> pd.DataFrame:
         """Preprocess addresses for comparison."""
-        df['combined_address'] = df[address_columns].fillna('').astype(str).agg(' '.join, axis=1)
+        # Combine, handling missing columns gracefully
+        df['combined_address'] = ""  # Initialize in case no columns are valid
+        valid_columns = [col for col in address_columns if col in df.columns] # Only existing columns
+        if valid_columns:
+            df['combined_address'] = df[valid_columns].fillna('').astype(str).agg(', '.join, axis=1)
+
         df['normalized_address'] = df['combined_address'].apply(self.address_model.normalize_address)
         return df
-    
-    def process_chunk(self, 
-                     chunk_df1: pd.DataFrame, 
+
+
+    def process_chunk(self,
+                     chunk_df1: pd.DataFrame,
                      df2: pd.DataFrame,
-                     columns1: List[str], 
+                     columns1: List[str],
                      columns2: List[str],
                      threshold: float) -> List[Dict]:
         """Process chunks with parallel comparison."""
+
+        # Preprocessing *inside* process_chunk (but on the entire df2 only once).
         chunk_df1 = self.preprocess_addresses(chunk_df1, columns1)
-        df2 = self.preprocess_addresses(df2, columns2)
-        
+        # Only preprocess df2 *once*, outside the inner loop
+        # The check here now makes more sense, as df2 is always the "full" df2.
+        if not hasattr(df2, 'normalized_address'):
+           df2 = self.preprocess_addresses(df2, columns2)
+
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = []
             for _, row1 in chunk_df1.iterrows():
                 future = executor.submit(
-                    self._find_best_match,
+                    self._find_best_match,  # Submit the task
                     row1,
                     df2,
                     threshold
                 )
                 futures.append(future)
-            
+
             results = []
-            for future in as_completed(futures):
+            for future in as_completed(futures):  # Iterate as they complete
                 try:
-                    match = future.result()
+                    match = future.result()  # Get the result (or exception)
                     if match:
                         results.append(match)
                 except Exception as e:
-                    logger.error(f"Error processing match: {e}")
-        
+                    logger.error(f"Error processing match: {e}") # Log individual errors, continue
+
         return results
-    
-    def _find_best_match(self, 
-                        row1: pd.Series, 
-                        df2: pd.DataFrame, 
+
+
+    def _find_best_match(self,
+                        row1: pd.Series,
+                        df2: pd.DataFrame,
                         threshold: float) -> Optional[Dict]:
         """Find best matching address with vectorized operations."""
         try:
-            # Vectorized comparison
+            # Vectorized comparison using apply and Series.
             scores = df2['normalized_address'].apply(
                 lambda x: self.address_model.compare_addresses(
-                    row1['normalized_address'], 
+                    row1['normalized_address'],
                     x
                 )
             )
-            
-            best_idx = scores.argmax()
-            best_score = scores[best_idx]
-            
+
+            # Find the index of the best score.
+            best_idx = scores.idxmax()  # Use idxmax for index of max value
+            best_score = scores.loc[best_idx] # Get score using the index
+
             if best_score > threshold:
                 return {
                     'source_address': row1['combined_address'],
                     'normalized_source': row1['normalized_address'],
-                    'matched_address': df2.iloc[best_idx]['combined_address'],
-                    'normalized_match': df2.iloc[best_idx]['normalized_address'],
-                    'match_score': float(best_score)
+                    'matched_address': df2.loc[best_idx]['combined_address'],  # Access by index
+                    'normalized_match': df2.loc[best_idx]['normalized_address'],
+                    'match_score': float(best_score)  # Ensure float
                 }
-            
-            return None
-            
+
+            return None  # Explicitly return None if no match
+
         except Exception as e:
             logger.error(f"Error finding best match: {e}")
-            return None
+            return None # Return None on error
+
+    def load_and_validate_file(self, file, file_key: str) -> pd.DataFrame:
+        """Loads and validates an uploaded file."""
+        ALLOWED_EXTENSIONS = {'.csv', '.xlsx'}
+        if not file:
+            raise ValueError(f"Missing file: {file_key}")
+
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        if file_ext not in ALLOWED_EXTENSIONS:
+            raise ValueError(f"Invalid file type for {file_key}: {file.filename}")
+
+        try:
+            if file_ext == '.csv':
+                df = pd.read_csv(file)
+            elif file_ext == '.xlsx':
+                df = pd.read_excel(file, engine='openpyxl')
+            else:  # Should never get here because of the extension check above
+                raise ValueError(f"Unsupported file type: {file.filename}")
+            return df
+
+        except Exception as e:
+            logger.exception(f"Error loading file {file.filename}:")
+            raise
