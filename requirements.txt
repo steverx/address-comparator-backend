@@ -1,0 +1,40 @@
+# Core dependencies
+Flask==2.3.3
+Flask-Cors==4.0.0
+Werkzeug==2.3.7
+gunicorn==21.2.0
+waitress==2.1.2
+uwsgi==2.0.22
+
+# Data processing
+pandas==2.0.3
+numpy==1.24.3
+openpyxl==3.1.2
+XlsxWriter==3.1.2
+
+# Address matching
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.21.1
+usaddress==0.5.10
+pyap==0.3.1  # Added for international address parsing
+
+# Monitoring and utilities
+psutil==5.9.5
+python-dotenv==1.0.0
+prometheus-client==0.17.1  # Added for metrics
+sentry-sdk==1.29.2  # Added for error tracking
+
+# Rate limiting and security
+Flask-Limiter==3.10.1
+limits==4.0.1
+Flask-Talisman==1.1.0  # Added for security headers
+
+# Machine Learning
+scikit-learn==1.3.0
+jellyfish==1.0.1
+
+# Testing and development
+pytest==7.4.2
+pytest-cov==4.1.0
+black==23.7.0
+flake8==6.1.0
