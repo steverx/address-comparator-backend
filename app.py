@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import pandas as pd
 from fuzzywuzzy import fuzz
-import utils.address_utils as address_utils
+from utils.address_utils import AddressCorrectionModel
 import io
 import logging
 import os
@@ -29,14 +29,15 @@ ALLOWED_EXTENSIONS = {'.csv', '.xlsx'}
 DEFAULT_THRESHOLD = 80
 CHUNK_SIZE = 10000
 
+# Initialize address correction model
+address_model = AddressCorrectionModel()
+
 def cleanup_memory(dataframes: List[pd.DataFrame] = None):
     """Enhanced memory cleanup."""
     if dataframes:
         for df in dataframes:
             del df
     gc.collect()
-    
-    # Log memory usage
     memory = psutil.virtual_memory()
     logger.info(f"Memory usage after cleanup: {memory.percent}%")
 
@@ -88,7 +89,7 @@ def create_app():
                 logger.error(f"Error reading file {file_storage.filename}: {e}")
                 raise
 
-        def combine_address_components(row: pd.Series, columns: List[str], is_excel: bool = False) -> str:
+        def combine_address_components(row: pd.Series, columns: List[str]) -> str:
             """Combine address components into a single string."""
             components = []
             for col in columns:
@@ -97,6 +98,75 @@ def create_app():
                     if val:
                         components.append(val)
             return ', '.join(components) if components else ''
+
+        def process_address_comparison(
+            df1: pd.DataFrame,
+            df2: pd.DataFrame,
+            columns1: List[str],
+            columns2: List[str],
+            threshold: float
+        ) -> List[Dict]:
+            """Process address comparison with ML-enhanced matching."""
+            try:
+                results = []
+                
+                df1['combined_address'] = df1.apply(
+                    lambda row: combine_address_components(row, columns1), axis=1
+                )
+                df2['combined_address'] = df2.apply(
+                    lambda row: combine_address_components(row, columns2), axis=1
+                )
+                
+                for chunk1 in process_dataframe_in_chunks(df1):
+                    for chunk2 in process_dataframe_in_chunks(df2):
+                        chunk1['normalized_address'] = chunk1['combined_address'].apply(
+                            lambda addr: address_model.normalize_address(addr)
+                        )
+                        chunk2['normalized_address'] = chunk2['combined_address'].apply(
+                            lambda addr: address_model.normalize_address(addr)
+                        )
+                        
+                        for _, row1 in chunk1.iterrows():
+                            matches = []
+                            for _, row2 in chunk2.iterrows():
+                                score = address_model.compare_addresses(
+                                    row1['normalized_address'],
+                                    row2['normalized_address']
+                                )
+                                if score >= threshold:
+                                    matches.append({
+                                        'address': row2['combined_address'],
+                                        'score': score,
+                                        'normalized': row2['normalized_address']
+                                    })
+                            
+                            if matches:
+                                results.append({
+                                    'source_address': row1['combined_address'],
+                                    'normalized_source': row1['normalized_address'],
+                                    'matches': sorted(matches, key=lambda x: x['score'], reverse=True)
+                                })
+                
+                return results
+            
+            except Exception as e:
+                logger.exception("Error in address comparison")
+                raise
+
+        @app.route('/')
+        def index():
+            """Root endpoint for API documentation."""
+            return jsonify({
+                'status': 'running',
+                'version': '1.0',
+                'endpoints': {
+                    'health': '/health',
+                    'columns': '/columns',
+                    'compare': '/compare',
+                    'validate': '/validate'
+                },
+                'timestamp': datetime.datetime.utcnow().isoformat()
+            }), 200
 
         @app.route('/health')
         def health_check():
@@ -196,10 +266,9 @@ def create_app():
 
                 results = process_address_comparison(
                     df1, df2,
-                    address_columns1, address_columns2,
-                    threshold,
-                    file1.filename.endswith('.xlsx'),
-                    file2.filename.endswith('.xlsx')
+                    address_columns1,
+                    address_columns2,
+                    threshold
                 )
 
                 cleanup_memory([df1, df2])
@@ -211,6 +280,45 @@ def create_app():
 
             except Exception as e:
                 logger.exception("Error in compare_addresses")
+                return jsonify({
+                    'status': 'error',
+                    'error': str(e)
+                }), 500
+
+        @app.route('/validate', methods=['POST'])
+        def validate_address():
+            """Validate and normalize a single address."""
+            try:
+                if not request.is_json:
+                    return jsonify({
+                        'status': 'error',
+                        'error': 'Request must be JSON'
+                    }), 400
+
+                data = request.get_json()
+                address = data.get('address')
+                
+                if not address:
+                    return jsonify({
+                        'status': 'error',
+                        'error': 'Address is required'
+                    }), 400
+
+                normalized = address_model.normalize_address(address)
+                corrections = address_model.suggest_corrections(address)
+                
+                return jsonify({
+                    'status': 'success',
+                    'data': {
+                        'original': address,
+                        'normalized': normalized,
+                        'suggestions': corrections,
+                        'valid': address_model.is_valid_address(normalized)
+                    }
+                }), 200
+
+            except Exception as e:
+                logger.exception("Error in address validation")
                 return jsonify({
                     'status': 'error',
                     'error': str(e)
@@ -249,9 +357,13 @@ def create_app():
 if __name__ == '__main__':
     try:
         app = create_app()
-        port = int(os.environ.get('PORT', 5000))
+        port = int(os.environ.get('PORT', '5000'))
         logger.info(f"Starting server on port {port}")
-        app.run(host='0.0.0.0', port=port, debug=DEBUG)
+        app.run(
+            host='0.0.0.0',
+            port=port,
+            debug=DEBUG
+        )
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}", exc_info=True)
         sys.exit(1)
