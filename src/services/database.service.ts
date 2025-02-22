@@ -1,15 +1,27 @@
-import { pool } from '../config/database.config';
+import { Pool } from 'pg';
+import { config } from 'dotenv';
 
-export async function findAddressMatches(address: string, threshold: number = 0.8): Promise<any[]> {
-    const query = `
-        SELECT 
-            raw_address,
-            normalized_address,
-            components,
-            metadata
-        FROM addresses;
-    `;
+config();
 
-    const result = await pool.query(query);
-    return result.rows;
+export const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
+
+export async function findAddressMatches(address: string, threshold: number) {
+    try {
+        const query = `
+            SELECT raw_address, member_id, lic, similarity(raw_address, $1) as match_score
+            FROM addresses
+            WHERE similarity(raw_address, $1) > $2
+            ORDER BY match_score DESC
+        `;
+        const result = await pool.query(query, [address, threshold / 100]);
+        return result.rows;
+    } catch (error) {
+        console.error('Database query error:', error);
+        throw new Error('Failed to search addresses');
+    }
 }

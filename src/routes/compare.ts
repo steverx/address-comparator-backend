@@ -1,35 +1,35 @@
-import { Request, Response } from 'express';
+import { Router } from 'express';
+import { z } from 'zod';
 import { findAddressMatches } from '../services/database.service';
 
-export const compareAddresses = async (req: Request, res: Response) => {
+const router = Router();
+
+const CompareRequestSchema = z.object({
+    sourceFile: z.array(z.record(z.string())),
+    columns: z.array(z.string()),
+    threshold: z.number().min(0).max(100)
+});
+
+router.post('/compare', async (req, res) => {
     try {
-        const { sourceFile, columns, threshold } = req.body;
-        const results = [];
-
-        for (const row of sourceFile) {
-            const address = formatAddress(row, columns);
-            const matches = await findAddressMatches(address, threshold / 100);
-
-            if (matches.length > 0) {
-                results.push({
-                    original_row: row,
-                    matches: matches
-                });
-            }
-        }
-
-        res.json({
-            status: 'success',
-            data: results
-        });
+        const validated = CompareRequestSchema.parse(req.body);
+        const results = await Promise.all(
+            validated.sourceFile.map(async (row) => {
+                const address = validated.columns
+                    .map(col => row[col])
+                    .filter(Boolean)
+                    .join(' ');
+                const matches = await findAddressMatches(address, validated.threshold);
+                return { original_row: row, matches };
+            })
+        );
+        res.json({ status: 'success', data: results });
     } catch (error) {
-        res.status(500).json({
-            status: 'error',
-            message: error instanceof Error ? error.message : 'Unknown error'
+        res.status(400).json({ 
+            status: 'error', 
+            message: error instanceof Error ? error.message : 'Invalid request' 
         });
     }
-};
+});
 
-function formatAddress(row: any, columns: string[]): string {
-    return columns.map(col => row[col] || '').filter(Boolean).join(' ');
-}
+export default router;
