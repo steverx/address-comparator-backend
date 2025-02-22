@@ -2,11 +2,40 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "Dockerfile"
+    "dockerfilePath": "Dockerfile",
+    "buildCommand": "docker build -t address-comparator ."
   },
   "deploy": {
+    "numReplicas": 2,
     "healthcheckPath": "/health",
-    "healthcheckTimeout": 30,
-    "restartPolicyType": "ON_FAILURE"
+    "healthcheckTimeout": 60,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3,
+    "startCommand": "gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers 4 --threads 8 --timeout 120 --worker-class=gthread --max-requests 1000 --max-requests-jitter 50",
+    "restartPolicyCondition": "any",
+    "volumes": [
+      {
+        "path": "/tmp",
+        "name": "temp-storage",
+        "size": "512Mi"
+      }
+    ],
+    "env": {
+      "FLASK_ENV": "production",
+      "PYTHONUNBUFFERED": "1",
+      "GUNICORN_CMD_ARGS": "--log-level info --access-logfile - --error-logfile -",
+      "FLASK_APP": "wsgi.py"
+    },
+    "healthcheck": {
+      "command": "curl -f http://localhost:$PORT/health || exit 1",
+      "interval": "30s",
+      "timeout": "10s",
+      "retries": 3,
+      "startPeriod": "40s"
+    },
+    "resources": {
+      "cpu": "1000m",
+      "memory": "512Mi"
+    }
   }
 }
