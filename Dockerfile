@@ -15,7 +15,7 @@ RUN apt-get update && \
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 
-# Install Python dependencies and explicitly install gunicorn
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install gunicorn==21.2.0
 
@@ -23,29 +23,31 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY . .
 
 # Set environment variables
-ENV PORT=8080
-ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
+ENV FLASK_ENV=production
 
-# Create start script with enhanced logging
+# Create start script with health check logging
 RUN echo '#!/bin/bash\n\
 echo "Starting Gunicorn server..."\n\
-echo "Current directory: $(pwd)"\n\
-echo "Python path: $(which python)"\n\
-echo "Files in current directory: $(ls -la)"\n\
-exec gunicorn --bind 0.0.0.0:$PORT \
+echo "Environment: $FLASK_ENV"\n\
+echo "Port: ${PORT:-8080}"\n\
+echo "Python version: $(python --version)"\n\
+exec gunicorn \
+--bind 0.0.0.0:${PORT:-8080} \
 --workers 4 \
 --threads 8 \
---timeout 0 \
---log-level debug \
+--timeout 30 \
+--log-level info \
 --access-logfile - \
 --error-logfile - \
 --preload \
-wsgi:application' > start.sh && \
+--worker-class gthread \
+wsgi:app' > start.sh && \
 chmod +x start.sh
 
-# Expose the port
-EXPOSE 8080
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
-# Run the start script
+# Start the application
 CMD ["./start.sh"]
