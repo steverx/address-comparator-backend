@@ -3,57 +3,14 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "Dockerfile",
-    "buildCommand": "docker build -t address-comparator .",
-    "watchPatterns": [
-      "**/*.py",
-      "requirements.txt",
-      "Dockerfile"
-    ]
+    "buildCommand": "docker build -t address-comparator ."
   },
   "deploy": {
-    "numReplicas": 2,
+    "numReplicas": 1,
     "healthcheckPath": "/health",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3,
-    "startCommand": "gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers 4 --threads 8 --timeout 120 --worker-class=gthread --max-requests 1000 --max-requests-jitter 50 --preload --worker-tmp-dir /dev/shm",
-    "restartPolicyCondition": "any",
-    "volumes": [
-      {
-        "path": "/tmp",
-        "name": "temp-storage",
-        "size": "512Mi",
-        "type": "tmpfs"
-      }
-    ],
-    "env": {
-      "FLASK_ENV": "production",
-      "PYTHONUNBUFFERED": "1",
-      "GUNICORN_CMD_ARGS": "--log-level info --access-logfile - --error-logfile - --capture-output --enable-stdio-inheritance",
-      "FLASK_APP": "wsgi.py",
-      "PYTHONPATH": "/app"
-    },
-    "healthcheck": {
-      "command": "curl -f http://localhost:$PORT/health || exit 1",
-      "interval": "30s",
-      "timeout": "10s",
-      "retries": 3,
-      "startPeriod": "40s"
-    },
-    "resources": {
-      "cpu": "1000m",
-      "memory": "512Mi",
-      "limits": {
-        "cpu": "1500m",
-        "memory": "768Mi"
-      }
-    },
-    "logging": {
-      "driver": "json-file",
-      "options": {
-        "max-size": "10m",
-        "max-file": "3"
-      }
-    }
+    "startCommand": "gunicorn wsgi:application --bind 0.0.0.0:$PORT"
   }
 }
