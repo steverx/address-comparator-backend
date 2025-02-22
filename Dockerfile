@@ -27,11 +27,11 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 # Copy application code
 COPY --chown=appuser:appuser . .
 
-# Set environment variables
+# Set environment variables (consolidated)
 ENV PYTHONUNBUFFERED=1 \
     FLASK_ENV=production \
     PORT=5000 \
-    GUNICORN_CMD_ARGS="--workers=4 --threads=8 --timeout=60 --bind=0.0.0.0:5000 --worker-class=gthread"
+    GUNICORN_CMD_ARGS="--workers=4 --threads=8 --timeout=120 --bind=0.0.0.0:5000 --worker-class=gthread --max-requests=1000 --max-requests-jitter=50 --graceful-timeout=30 --keep-alive=5"
 
 # Create start script with enhanced logging
 RUN echo '#!/bin/bash\n\
@@ -39,13 +39,13 @@ echo "Starting Gunicorn server..."\n\
 echo "Environment: $FLASK_ENV"\n\
 echo "Port: $PORT"\n\
 echo "Python version: $(python --version)"\n\
-echo "Memory limit: $(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)"\n\
-echo "CPU quota: $(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us)"\n\
+echo "Memory limit: $(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || echo N/A)"\n\
+echo "CPU quota: $(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null || echo N/A)"\n\
 exec gunicorn \
 --bind 0.0.0.0:$PORT \
 --workers 4 \
 --threads 8 \
---timeout 60 \
+--timeout 120 \
 --log-level info \
 --access-logfile - \
 --error-logfile - \
@@ -61,9 +61,9 @@ chmod +x /app/start.sh
 # Switch to non-root user
 USER appuser
 
-# Health check with improved logging
+# Health check with improved logging and error handling
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:$PORT/health || (echo "Health check failed" && exit 1)
+    CMD curl -f http://localhost:$PORT/health || (echo "Health check failed at $(date)" >> /tmp/health.log && exit 1)
 
-# Start command
+# Single CMD instruction
 CMD ["/app/start.sh"]
