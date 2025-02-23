@@ -1,68 +1,64 @@
-# Build stage
-FROM python:3.9-slim as builder
+# Builder stage (Pulls from your registry - replace with your actual image)
+FROM steverx/libpostal-builder:latest as libpostal-builder
 
-# Install build dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        gcc \
-        g++ \
-        make \
-        python3-dev \
-        libpq-dev \
-        curl \
-        git \
-        autoconf \
-        automake \
-        libtool \
-        pkg-config \
-        build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create data directory
-RUN mkdir -p /usr/local/data
-
-# Clone and build libpostal with progress output
-RUN git clone --depth 1 https://github.com/openvenues/libpostal && \
-    cd libpostal && \
-    ./bootstrap.sh && \
-    ./configure --datadir=/usr/local/data --prefix=/usr/local && \
-    make CFLAGS="-O2 -fPIC" -j$(nproc) V=1 && \
-    make install && \
-    ldconfig
-
-# Final stage
+# --- Final Backend Image ---
 FROM python:3.9-slim
-
-# Copy libpostal from builder
-COPY --from=builder /usr/local/lib/libpostal.* /usr/local/lib/
-COPY --from=builder /usr/local/include/libpostal /usr/local/include/libpostal
-COPY --from=builder /usr/local/data /usr/local/data
-
-# Install runtime dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        libgcc1 \
-        libstdc++6 \
-    && rm -rf /var/lib/apt/lists/* && \
-    ldconfig
-
-# Set environment variables
-ENV CFLAGS="-I/usr/local/include"
-ENV LDFLAGS="-L/usr/local/lib"
-ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
 
 WORKDIR /app
 
-# Copy and install requirements
+# Install system dependencies (nginx and ca-certificates ONLY)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        nginx \
+        ca-certificates \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install su-exec
+RUN curl -L -o /usr/local/bin/su-exec https://github.com/ncopa/su-exec/releases/download/0.2/su-exec-amd64 && \
+    chmod +x /usr/local/bin/su-exec
+
+# Create a non-root user
+RUN useradd -m -d /home/appuser -s /bin/bash appuser
+
+# Copy libpostal files from the builder stage (with correct ownership)
+COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/lib/libpostal.so* /usr/local/lib/
+COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/include/libpostal/ /usr/local/include/libpostal/
+COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/share/libpostal/ /usr/local/share/libpostal/
+COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/data/ /usr/local/data/
+
+# Set environment variables
+ENV LIBPOSTAL_INCLUDE_DIR=/usr/local/include
+ENV LIBPOSTAL_LIB_DIR=/usr/local/lib
+ENV LIBPOSTAL_DATA_DIR=/usr/local/data
+ENV LD_LIBRARY_PATH="${LIBPOSTAL_LIB_DIR}:${LD_LIBRARY_PATH}"
+ENV PORT=80
+ENV APP_PORT=5000
+
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy application code (with correct ownership)
+COPY --chown=appuser:appuser . .
+
+# Configure nginx
+COPY --chown=www-data:www-data nginx.conf /etc/nginx/nginx.conf
+RUN mkdir -p /usr/share/nginx/html && \
+    chown -R www-data:www-data /usr/share/nginx/html
+
+# Switch to root user for entrypoint (then switch back to appuser)
+USER root
+COPY entrypoint.sh /
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Expose port
+EXPOSE ${PORT}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-5000}/health || exit 1
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Start application
-CMD ["python", "app.py"]
+# Start Nginx (your app will be started by Gunicorn or similar, proxied by Nginx)
+CMD ["nginx", "-g", "daemon off;"]
