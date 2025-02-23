@@ -2,14 +2,14 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies more efficiently, including libpostal-dev
+# Install system dependencies, including libpostal-dev
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gcc \
         python3-dev \
         libpq-dev \
         curl \
-        libpostal-dev \
+    && apt-get install -y --no-install-recommends libpostal-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
