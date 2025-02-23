@@ -44,7 +44,6 @@ echo "Environment: $FLASK_ENV"\n\
 echo "Port: $PORT"\n\
 echo "Python version: $(python --version)"\n\
 echo "Memory limit: $(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || echo N/A)"\n\
-echo "CPU quota: $(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null || echo N/A)"\n\
 exec gunicorn \
 --bind 0.0.0.0:$PORT \
 --workers 4 \
