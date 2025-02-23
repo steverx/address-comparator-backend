@@ -12,7 +12,7 @@ RUN apt-get update && \
         python3-dev \
         libpq-dev \
         curl \
-    && apt-get install -y -t bookworm-backports libpostal-dev \
+    && apt-get install -y --no-install-recommends -t bookworm-backports libpostal-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
