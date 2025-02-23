@@ -3,7 +3,7 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Add the debian backports repository
-RUN echo "deb http://deb.debian.org/debian bookworm-backports main" >> /etc/apt/sources.list
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" >> /etc/apt/sources.list.d/bookworm-backports.list
 
 # Update apt and install system dependencies, including libpostal-dev from backports
 RUN apt-get update && \
@@ -12,7 +12,7 @@ RUN apt-get update && \
         python3-dev \
         libpq-dev \
         curl \
-        libpostal-dev -t bookworm-backports \
+    && apt-get install -y --no-install-recommends -t bookworm-backports libpostal-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
