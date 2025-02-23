@@ -381,41 +381,7 @@ def create_app():
 
         @app.route("/health")
         def health_check():
-            """Health check endpoint."""
-            try:
-                memory = psutil.virtual_memory()
-                disk = psutil.disk_usage("/")
-                health_data = {
-                    "status": "healthy",
-                    "timestamp": datetime.datetime.utcnow().isoformat(),
-                    "memory": {
-                        "total": memory.total,
-                        "available": memory.available,
-                        "percent": memory.percent,
-                    },
-                    "disk": {
-                        "total": disk.total,
-                        "free": disk.free,
-                        "percent": disk.percent,
-                    },
-                    "pid": os.getpid(),
-                    "uptime": datetime.datetime.now().timestamp()
-                    - psutil.Process().create_time(),
-                }
-                logger.info(f"Health check passed: {health_data}")
-                return jsonify(health_data), 200
-            except Exception as e:
-                logger.exception("Health check failed")
-                return (
-                    jsonify(
-                        {
-                            "status": "unhealthy",
-                            "error": str(e),
-                            "timestamp": datetime.datetime.utcnow().isoformat(),
-                        }
-                    ),
-                    500,
-                )
+            return jsonify({'status': 'healthy'}), 200
 
         @app.before_request
         def before_request():
