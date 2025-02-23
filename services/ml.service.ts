@@ -5,7 +5,7 @@ export class AddressMatcher {
     private static instance: AddressMatcher;
     private vectorizer: TfidfVectorizer;
     private addressVectors: number[][];
-    
+
     static async getInstance(): Promise<AddressMatcher> {
         if (!AddressMatcher.instance) {
             AddressMatcher.instance = new AddressMatcher();
@@ -18,7 +18,7 @@ export class AddressMatcher {
         addresses: string[],
         threshold: number,
         returnTop: number
-    }): Promise<Array<{index: number, score: number}>> {
+    }): Promise<Array<{ index: number, score: number }>> {
         const queryVector = this.vectorizer.transform([queryAddress])[0];
         const similarities = options.addresses.map((_, index) => ({
             index,
@@ -32,7 +32,6 @@ export class AddressMatcher {
     }
 
     private async initialize() {
-        // Initialize ML model components
         this.vectorizer = new TfidfVectorizer({
             ngramRange: [2, 3],
             analyzer: 'char'
