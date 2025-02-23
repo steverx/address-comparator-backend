@@ -2,10 +2,6 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Set environment variables for libpostal build
-ENV CFLAGS="-I/usr/local/include"
-ENV LDFLAGS="-L/usr/local/lib"
-
 # Add the debian backports repository
 RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/bookworm-backports.list
 
