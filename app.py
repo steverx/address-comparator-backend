@@ -171,6 +171,12 @@ def create_app():
                     return pd.read_excel(file_storage)
                 else:
                     raise ValueError(f"Unsupported file type: {file_storage.filename}")
+            except FileNotFoundError:
+                logger.error(f"File not found: {file_storage.filename}")
+                raise
+            except pd.errors.ParserError:
+                logger.error(f"Error parsing file: {file_storage.filename}")
+                raise
             except Exception as e:
                 logger.error(f"Error reading file {file_storage.filename}: {e}")
                 raise
@@ -473,7 +479,8 @@ def create_app():
                 )  # Bad Request
             except Exception as e:
                 logger.exception("Error processing comparison request:")
-                return jsonify({"status": "error", "error": str(e)}), 500
+                # Optionally, include more details in the response
+                return jsonify({"status": "error", "error": str(e), "details": traceback.format_exc()}), 500
 
         @app.route("/validate", methods=["POST"])
         def validate_address():
