@@ -1,5 +1,5 @@
-# Use a Python base image
-FROM python:3.9-slim
+# Build stage
+FROM python:3.9-slim as builder
 
 # Install build dependencies
 RUN apt-get update && \
@@ -16,37 +16,53 @@ RUN apt-get update && \
         libtool \
         pkg-config \
         build-essential \
-        libsnappy-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create data directory
 RUN mkdir -p /usr/local/data
 
-# Clone and build libpostal from source with verbose output
-RUN git clone https://github.com/openvenues/libpostal && \
+# Clone and build libpostal with progress output
+RUN git clone --depth 1 https://github.com/openvenues/libpostal && \
     cd libpostal && \
     ./bootstrap.sh && \
     ./configure --datadir=/usr/local/data --prefix=/usr/local && \
-    make CFLAGS="-O3 -fPIC" -j4 && \
+    make CFLAGS="-O2 -fPIC" -j$(nproc) V=1 && \
     make install && \
     ldconfig
 
-# Set environment variables for python-libpostal
+# Final stage
+FROM python:3.9-slim
+
+# Copy libpostal from builder
+COPY --from=builder /usr/local/lib/libpostal.* /usr/local/lib/
+COPY --from=builder /usr/local/include/libpostal /usr/local/include/libpostal
+COPY --from=builder /usr/local/data /usr/local/data
+
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libgcc1 \
+        libstdc++6 \
+    && rm -rf /var/lib/apt/lists/* && \
+    ldconfig
+
+# Set environment variables
 ENV CFLAGS="-I/usr/local/include"
 ENV LDFLAGS="-L/usr/local/lib"
 ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
 
-# Set the working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
+# Copy and install requirements
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
+# Copy application code
 COPY . .
 
-# Start the application
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-5000}/health || exit 1
+
+# Start application
 CMD ["python", "app.py"]
