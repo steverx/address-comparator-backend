@@ -192,14 +192,19 @@ def create_app():
             return ", ".join(components) if components else ""
 
         def validate_request_files(request_files):
-            """Validate uploaded files."""
-            if not all(key in request_files for key in ["file1", "file2"]):
-                raise ValueError("Missing required files")
-
+            """Validate request files."""
             files = {key: request_files[key] for key in ["file1", "file2"]}
             for name, file in files.items():
-                if not file or not allowed_file(file.filename):
+                if not file:
+                    raise ValueError(f"Missing file: {name}")
+                if not allowed_file(file.filename):
                     raise ValueError(f"Invalid file type for {name}: {file.filename}")
+                # Check file size (optional)
+                file.seek(0, os.SEEK_END)  # Go to the end of the file
+                file_length = file.tell()  # Get the file length
+                file.seek(0)  # Reset the file pointer to the beginning
+                if file_length > MAX_CONTENT_LENGTH:
+                    raise ValueError(f"File {name} exceeds maximum allowed size")
             return files
 
         def validate_columns(form_data):
@@ -466,6 +471,16 @@ def create_app():
                 df1 = load_dataframe(files["file1"])
                 df2 = load_dataframe(files["file2"])
 
+                # Validate threshold
+                threshold_str = request.form.get("threshold", str(DEFAULT_THRESHOLD))
+                try:
+                    threshold = float(threshold_str) / 100
+                    if not 0 <= threshold <= 1:
+                        raise ValueError("Threshold must be between 0 and 100")
+                except ValueError:
+                    logger.warning(f"Invalid threshold value: {threshold_str}")
+                    return jsonify({'status': 'error', 'error': 'Invalid threshold value'}), 400
+
                 task = process_address_comparison_task.delay(
                     df1.to_dict(), df2.to_dict(), columns1, columns2, threshold
                 )
@@ -479,8 +494,7 @@ def create_app():
                 )  # Bad Request
             except Exception as e:
                 logger.exception("Error processing comparison request:")
-                # Optionally, include more details in the response
-                return jsonify({"status": "error", "error": str(e), "details": traceback.format_exc()}), 500
+                return jsonify({"status": "error", "error": str(e)}), 500
 
         @app.route("/validate", methods=["POST"])
         def validate_address():
