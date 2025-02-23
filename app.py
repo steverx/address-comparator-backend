@@ -49,6 +49,9 @@ from postal.parser import parse_address  # Import libpostal
 import tracemalloc  # Import memory profiler
 import subprocess
 import json
+import functools
+from flask_httpauth import HTTPBasicAuth
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 CORS(app, origins="https://address-comparator-frontend-production.up.railway.app")
@@ -83,6 +86,22 @@ celery = Celery(app.name, broker=CELERY_BROKER_URL)
 # Start memory profiler
 tracemalloc.start()
 
+auth = HTTPBasicAuth()
+
+users = {
+    "admin": generate_password_hash("secret")  # Replace with a strong password and secure storage
+}
+
+@auth.verify_password
+def verify_password(username, password):
+    if username in users and check_password_hash(users.get(username), password):
+        return username
+    return None
+
+@app.route('/admin')
+@auth.login_required
+def admin_route():
+    return "Admin area - requires authentication"
 
 def cleanup_memory(dataframes: List[pd.DataFrame] = None):
     """Enhanced memory cleanup."""
@@ -99,6 +118,7 @@ def sanitize_input(text):
     return bleach.clean(text)
 
 
+@functools.lru_cache(maxsize=1024)  # Cache up to 1024 results
 def normalize_address(address):
     """Normalize address using libpostal."""
     parsed_address = parse_address(address)
