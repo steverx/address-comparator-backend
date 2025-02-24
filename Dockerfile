@@ -15,6 +15,19 @@ RUN apt-get update && \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install system dependencies for postal
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3-dev \
+        gcc \
+        g++ \
+        make \
+        autoconf \
+        automake \
+        libtool \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create non-root user and required directories
 RUN useradd -m -d /home/appuser -s /bin/bash appuser && \
     mkdir -p /usr/share/nginx/html && \
@@ -46,6 +59,9 @@ ENV LIBPOSTAL_INCLUDE_DIR=/usr/local/include \
 # Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Python postal package
+RUN pip install --no-cache-dir postal==1.1.10
 
 # Application setup
 COPY --chown=appuser:appuser . .

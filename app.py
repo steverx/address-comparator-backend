@@ -2,6 +2,13 @@
 import os
 import logging
 import sys
+from postal.parser import parse_address
+from postal.expand import expand_address
+
+# Initialize libpostal with correct paths
+os.environ['LIBPOSTAL_DATA_DIR'] = '/usr/local/share'
+os.environ['LIBPOSTAL_INCLUDE_DIR'] = '/usr/local/include'
+os.environ['LIBPOSTAL_LIB_DIR'] = '/usr/local/lib'
 
 # Initialize logger before other imports
 logging.basicConfig(
