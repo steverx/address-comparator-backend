@@ -1,63 +1,66 @@
-# Builder stage (Pulls from your registry - replace with your actual image)
-FROM steverx/libpostal-builder:latest as libpostal-builder
+# Builder stage
+FROM steverx/libpostal-builder:latest AS libpostal-builder
 
-# --- Final Backend Image ---
+# Final Backend Image
 FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies (nginx and ca-certificates ONLY)
+# Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        nginx \
+        ca-certificates \
         gosu \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
+# Create non-root user and required directories
 RUN useradd -m -d /home/appuser -s /bin/bash appuser && \
     mkdir -p /usr/share/nginx/html && \
-    chown -R www-data:www-data /usr/share/nginx/html
-
-# Create log directories
-RUN mkdir -p /var/log/nginx && \
+    mkdir -p /var/log/nginx && \
+    chown -R www-data:www-data /usr/share/nginx/html && \
     chown -R www-data:www-data /var/log/nginx
 
-# Copy libpostal files from the builder stage (with correct ownership)
-COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/lib/libpostal.so* /usr/local/lib/
-COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/include/libpostal/ /usr/local/include/libpostal/
-COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/share/libpostal/ /usr/local/share/libpostal/
-COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/data/ /usr/local/data/
+# Create base directories with proper permissions
+RUN mkdir -p /usr/local/lib && \
+    mkdir -p /usr/local/include && \
+    mkdir -p /usr/local/share && \
+    chown -R appuser:appuser /usr/local/lib && \
+    chown -R appuser:appuser /usr/local/include && \
+    chown -R appuser:appuser /usr/local/share
 
-# Set environment variables
+# Copy libpostal files
+COPY --from=libpostal-builder /usr/local/lib/* /usr/local/lib/
+COPY --from=libpostal-builder /usr/local/include/* /usr/local/include/
+COPY --from=libpostal-builder /usr/local/share/* /usr/local/share/
+
+# Environment setup
 ENV LIBPOSTAL_INCLUDE_DIR=/usr/local/include \
     LIBPOSTAL_LIB_DIR=/usr/local/lib \
-    LIBPOSTAL_DATA_DIR=/usr/local/data \
-    LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}" \
+    LIBPOSTAL_DATA_DIR=/usr/local/share \
+    LD_LIBRARY_PATH=/usr/local/lib \
     PORT=80 \
     APP_PORT=5000
 
-# Copy requirements and install Python dependencies
+# Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code (with correct ownership)
+# Application setup
 COPY --chown=appuser:appuser . .
-
-# Configure nginx
 COPY --chown=www-data:www-data nginx.conf /etc/nginx/nginx.conf
 COPY entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 
-# Configure permissions
+# Configure permissions and update library cache
 RUN ldconfig && \
     chown -R appuser:appuser /app
 
-# Expose port
+# Expose port and health check
 EXPOSE ${PORT}
-
-# Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Start Nginx (your app will be started by Gunicorn or similar, proxied by Nginx)
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
