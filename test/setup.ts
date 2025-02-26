@@ -1,1 +1,0 @@
-process.env.DATABASE_URL = 'mock_database_url';

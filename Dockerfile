@@ -1,70 +1,65 @@
-# Builder stage
+# Use a consistent name for the builder stage
 FROM steverx/libpostal-builder:latest as libpostal-builder
 
-# Final Backend Image
+# --- Final Backend Image ---
 FROM python:3.9-slim
 
-WORKDIR /app
+WORKDIR /app  # Set the working directory
 
 # Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        build-essential \
-        python3-dev \
-        pkg-config \
         nginx \
         ca-certificates \
         gosu \
-        libpq-dev \
-        curl \
+        libpq-dev \  # Keep libpq-dev ONLY if needed
     && rm -rf /var/lib/apt/lists/*
 
-# Create directories and user
-RUN useradd -m -d /home/appuser -s /bin/bash appuser && \
-    mkdir -p /usr/local/{lib/pkgconfig,include/libpostal,share/libpostal}
+# Create a non-root user
+RUN useradd -m -d /home/appuser -s /bin/bash appuser
 
-# Copy libpostal files from builder
-COPY --from=libpostal-builder /usr/local/lib/libpostal.so* /usr/local/lib/
-COPY --from=libpostal-builder /usr/local/lib/pkgconfig/libpostal.pc /usr/local/lib/pkgconfig/
-COPY --from=libpostal-builder /usr/local/include/libpostal/ /usr/local/include/libpostal/
-COPY --from=libpostal-builder /usr/local/share/libpostal/ /usr/local/share/libpostal/
-
-# Verify files and update library cache
-RUN ls -la /usr/local/lib/libpostal* && \
-    ls -la /usr/local/include/libpostal && \
-    ls -la /usr/local/share/libpostal && \
-    ldconfig
+# Copy libpostal files from the builder stage *with correct ownership*
+COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/lib/libpostal.so* /usr/local/lib/
+COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/include/libpostal/ /usr/local/include/libpostal/
+COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/share/libpostal/ /usr/local/share/libpostal/
+COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/data/ /usr/local/data/
 
 # Set environment variables
-ENV LIBPOSTAL_DATA_DIR=/usr/local/share/libpostal \
-    LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH \
-    PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
-    PORT=80 \
-    APP_PORT=5000
+ENV LIBPOSTAL_INCLUDE_DIR=/usr/local/include
+ENV LIBPOSTAL_LIB_DIR=/usr/local/lib
+ENV LIBPOSTAL_DATA_DIR=/usr/local/data
+ENV LD_LIBRARY_PATH="${LIBPOSTAL_LIB_DIR}:${LD_LIBRARY_PATH}"
+ENV APP_PORT=5000
 
-# Install Python dependencies
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt && \
-    PKG_CONFIG_PATH=/usr/local/lib/pkgconfig pip install --no-cache-dir postal==1.1.10
+    pip install --no-cache-dir gunicorn
 
-# Copy application code and configure nginx
+# Copy application code (with correct ownership)
 COPY --chown=appuser:appuser . .
+
+# Configure nginx
 COPY --chown=www-data:www-data nginx.conf /etc/nginx/nginx.conf
+RUN mkdir -p /usr/share/nginx/html && \
+    chown -R www-data:www-data /usr/share/nginx/html
+
+# Switch to root user for entrypoint
+USER root
+
+# Set up entrypoint
 COPY entrypoint.sh /
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 
-# Set permissions
-RUN chmod +x /entrypoint.sh && \
-    mkdir -p /usr/share/nginx/html && \
-    chown -R www-data:www-data /usr/share/nginx/html && \
-    chown -R appuser:appuser /app
+# Expose port
+EXPOSE 80
 
-# Expose port and health check
-EXPOSE ${PORT}
+# Health check (use environment variable for PORT)
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Set entrypoint and default command
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "wsgi:app", "--bind", "0.0.0.0:5000"]
+# Start Nginx (your app will be started by gunicorn, proxied by Nginx)
+CMD ["nginx", "-g", "daemon off;"]
