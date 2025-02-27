@@ -42,6 +42,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code (with correct ownership)
 COPY --chown=appuser:appuser . .
 
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
 # Configure nginx
 COPY --chown=www-data:www-data nginx.conf /etc/nginx/nginx.conf
 RUN mkdir -p /usr/share/nginx/html && \
@@ -50,17 +53,15 @@ RUN mkdir -p /usr/share/nginx/html && \
 # Switch to root user for entrypoint
 USER root
 
-# Set up entrypoint
-COPY entrypoint.sh /
+# Copy and set permissions for entrypoint script
+COPY --chown=root:root entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
 
-# Expose port
+# Expose the port Nginx listens on
 EXPOSE 80
+
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Health check (use environment variable for PORT)
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
-
-# Start Nginx (your app will be started by gunicorn, proxied by Nginx)
-CMD ["nginx", "-g", "daemon off;"]
