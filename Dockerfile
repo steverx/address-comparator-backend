@@ -7,12 +7,13 @@ FROM python:3.9-slim
 WORKDIR /app  # Set the working directory
 
 # Install system dependencies
+# Keep libpq-dev ONLY if needed
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         nginx \
         ca-certificates \
         gosu \
-        libpq-dev \  # Keep libpq-dev ONLY if needed
+        libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -29,7 +30,7 @@ ENV LIBPOSTAL_INCLUDE_DIR=/usr/local/include
 ENV LIBPOSTAL_LIB_DIR=/usr/local/lib
 ENV LIBPOSTAL_DATA_DIR=/usr/local/data
 ENV LD_LIBRARY_PATH="${LIBPOSTAL_LIB_DIR}:${LD_LIBRARY_PATH}"
-ENV APP_PORT=5000
+ENV PORT=5000
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
