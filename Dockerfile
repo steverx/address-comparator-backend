@@ -7,7 +7,6 @@ FROM python:3.9-slim
 WORKDIR /app  # Set the working directory
 
 # Install system dependencies
-# Keep libpq-dev ONLY if needed
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         nginx \
@@ -22,7 +21,6 @@ RUN useradd -m -d /home/appuser -s /bin/bash appuser
 # Copy libpostal files from the builder stage *with correct ownership*
 COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/lib/libpostal.so* /usr/local/lib/
 COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/include/libpostal/ /usr/local/include/libpostal/
-COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/share/libpostal/ /usr/local/share/libpostal/
 COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/data/ /usr/local/data/
 
 # Set environment variables
