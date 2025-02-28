@@ -3,6 +3,7 @@ import sys
 import os
 from logging.handlers import RotatingFileHandler
 import psutil
+from waitress import serve
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -34,10 +35,6 @@ except Exception as e:
     raise
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "5000"))
-    logger.info(f"Starting development server on port {port}")
-    application.run(
-        host="0.0.0.0",
-        port=port,
-        debug=os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-    )
+    port = int(os.environ.get("PORT", 5000))
+    logger.info(f"Starting Waitress server on port {port}")
+    serve(create_app(), host="0.0.0.0", port=port)

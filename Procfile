@@ -1,1 +1,1 @@
-web: python -m waitress --port=$PORT --call app:create_app
+web: python wsgi.py

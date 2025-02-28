@@ -55,6 +55,9 @@ RUN pip install --no-cache-dir gunicorn
 # Add to your Dockerfile
 RUN pip install --no-cache-dir waitress
 
+# Add to your Dockerfile
+RUN pip install --no-cache-dir psutil
+
 # Copy application code
 COPY --chown=appuser:appuser . .
 
@@ -62,9 +65,5 @@ COPY --chown=appuser:appuser . .
 RUN mkdir -p /app/api /app/config /app/utils /app/tasks /app/tests && \
     touch /app/api/__init__.py /app/config/__init__.py /app/utils/__init__.py /app/tasks/__init__.py /app/tests/__init__.py
 
-# Create a launcher script that uses Gunicorn
-RUN echo '#!/bin/bash\nset -e\necho "Starting nginx..."\nnginx -g "daemon on;"\necho "Starting Gunicorn..."\ncd /app\nexec gunicorn --bind "0.0.0.0:${PORT}" "app:create_app()"' > /app/start.sh && \
-    chmod +x /app/start.sh
-
-# Command to run the app
-CMD ["python", "-m", "waitress", "--port=5000", "--call", "app:create_app"]
+# Replace any previous CMD with:
+CMD ["python", "wsgi.py"]
