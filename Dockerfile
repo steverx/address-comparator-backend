@@ -14,6 +14,7 @@ RUN apt-get update && \
         gosu \
         libpq-dev \
         build-essential \
+        git \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -37,8 +38,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
     ldconfig && \
-    # Install postal separately with specific flags
-    CFLAGS="-I${LIBPOSTAL_INCLUDE_DIR}" LDFLAGS="-L${LIBPOSTAL_LIB_DIR}" pip install --no-cache-dir postal && \
+    # Install older version of postal that's compatible with your libpostal
+    CFLAGS="-I${LIBPOSTAL_INCLUDE_DIR}" LDFLAGS="-L${LIBPOSTAL_LIB_DIR}" pip install --no-cache-dir postal==1.1.9 && \
     # Install the rest of requirements
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir gunicorn
