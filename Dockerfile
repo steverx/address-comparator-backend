@@ -84,4 +84,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Use this instead
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["sh", "-c", "nginx -g 'daemon on;' && cd /app && gunicorn --bind 0.0.0.0:${PORT} 'app:create_app()'"]
