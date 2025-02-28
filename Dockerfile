@@ -6,7 +6,7 @@ FROM python:3.9-slim
 
 WORKDIR /app  # Set the working directory
 
-# Install system dependencies including build essentials for postal
+# Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         nginx \
@@ -16,6 +16,7 @@ RUN apt-get update && \
         build-essential \
         git \
         curl \
+        golang \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -32,22 +33,22 @@ ENV LIBPOSTAL_LIB_DIR=/usr/local/lib
 ENV LIBPOSTAL_DATA_DIR=/usr/local/data
 ENV LD_LIBRARY_PATH="${LIBPOSTAL_LIB_DIR}:${LD_LIBRARY_PATH}"
 ENV PORT=5000
+ENV POSTAL_PORT=8080
+ENV GO111MODULE=on
+ENV GOPATH=/go
 
-# Copy requirements and install Python dependencies
+# Install gopostal (REST API for libpostal)
+RUN mkdir -p /go && \
+    go install github.com/openvenues/gopostal/cmd/postal-rest@latest && \
+    mv /go/bin/postal-rest /usr/local/bin/ && \
+    ldconfig
+
+# Copy requirements and install Python dependencies (without pypostal)
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
-    ldconfig && \
-    # Try a different approach using a stable version tag
-    git clone https://github.com/openvenues/pypostal && \
-    cd pypostal && \
-    # Use the main branch instead of a specific commit
-    CFLAGS="-I${LIBPOSTAL_INCLUDE_DIR}" LDFLAGS="-L${LIBPOSTAL_LIB_DIR}" pip install . && \
-    cd .. && \
-    rm -rf pypostal && \
-    # Install the rest of requirements
     pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir gunicorn
+    pip install --no-cache-dir gunicorn requests
 
 # Copy application code (with correct ownership)
 COPY --chown=appuser:appuser . .
@@ -59,9 +60,6 @@ COPY nginx.conf /etc/nginx/nginx.conf
 COPY --chown=www-data:www-data nginx.conf /etc/nginx/nginx.conf
 RUN mkdir -p /usr/share/nginx/html && \
     chown -R www-data:www-data /usr/share/nginx/html
-
-# Switch to root user for entrypoint
-USER root
 
 # Copy and set permissions for entrypoint script
 COPY --chown=root:root entrypoint.sh /entrypoint.sh

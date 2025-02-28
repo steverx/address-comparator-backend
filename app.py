@@ -2,8 +2,7 @@
 import os
 import logging
 import sys
-from postal.parser import parse_address
-from postal.expand import expand_address
+import requests
 
 # Initialize libpostal with correct paths
 os.environ['LIBPOSTAL_DATA_DIR'] = '/usr/local/share'
@@ -52,7 +51,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from celery import Celery  # Import Celery
 import bleach  # For input sanitization
-from postal.parser import parse_address  # Import libpostal
 import tracemalloc  # Import memory profiler
 import subprocess
 import json
@@ -580,3 +578,11 @@ if __name__ == "__main__":
     except Exception as e:
         logger.exception("Failed to start server:")  # Log the exception with traceback
         sys.exit(1)
+
+def parse_address(address):
+    response = requests.post('http://localhost:8080/parser', json={'query': address})
+    return response.json()
+
+def expand_address(address):
+    response = requests.post('http://localhost:8080/expand', json={'query': address})
+    return response.json()
