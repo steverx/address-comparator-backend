@@ -426,5 +426,35 @@ def validate_address():
 
 
 def register_api_blueprint(app):
-    """Register API routes with the Flask application."""
+    """Register API routes with Flask app."""
+    
+    # Create a blueprint
+    api_bp = Blueprint('api', __name__)
+    
+    @api_bp.route("/")
+    def index():
+        """Root endpoint."""
+        return jsonify({
+            "status": "running",
+            "version": "1.0",
+            "endpoints": {
+                "health": "/health",
+                "columns": "/columns",
+                "compare": "/compare",
+                "validate": "/validate",
+            },
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }), 200
+    
+    @api_bp.route("/health")
+    def health_check():
+        """Health check endpoint."""
+        return jsonify({"status": "healthy"}), 200
+    
+    # Add more endpoints here
+    # ...
+    
+    # Register the blueprint with the app
     app.register_blueprint(api_bp)
+    
+    return api_bp
