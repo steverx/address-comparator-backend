@@ -38,8 +38,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
     ldconfig && \
+    # Try a different approach - use a specified older commit of pypostal
     git clone https://github.com/openvenues/pypostal && \
     cd pypostal && \
+    git checkout 7e2d8c730f32a591fcf3d1d8f956a7bba5ab6a96 && \
     CFLAGS="-I${LIBPOSTAL_INCLUDE_DIR}" LDFLAGS="-L${LIBPOSTAL_LIB_DIR}" pip install . && \
     cd .. && \
     rm -rf pypostal && \
