@@ -1,1 +1,1 @@
-web: venv/bin/python app.py
+web: python -m waitress --port=$PORT --call app:create_app
