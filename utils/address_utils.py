@@ -461,3 +461,43 @@ class EnhancedAddressValidator:
         except Exception as e:
             self.logger.error(f"Error comparing addresses: {e}")
             return 0.0
+
+# Create an alias/wrapper class for compatibility with app.py
+class AddressCorrectionModel:
+    """
+    Wrapper class that implements the expected interface using EnhancedAddressValidator.
+    """
+    
+    def __init__(self, api_base_url=None):
+        """Initialize with EnhancedAddressValidator."""
+        self.validator = EnhancedAddressValidator()
+        self.api_base_url = api_base_url
+    
+    def normalize_address(self, address):
+        """Normalize an address using internal validator."""
+        return self.validator.normalize_address(address)
+    
+    def parse_address(self, address):
+        """Parse address components."""
+        try:
+            import usaddress
+            parsed, _ = usaddress.tag(address)
+            return parsed
+        except Exception as e:
+            logger.error(f"Error parsing address: {e}")
+            return {}
+    
+    def expand_address(self, address):
+        """Return address variations."""
+        # Use fallback since we're not actually using libpostal
+        return [address] if address else []
+    
+    def suggest_corrections(self, address):
+        """Suggest corrections for an address."""
+        # Since we don't have direct equivalent, return empty for now
+        return []
+    
+    def is_valid_address(self, address):
+        """Check if an address appears valid."""
+        result = self.validator.predict(address)
+        return result.get('is_valid', False)

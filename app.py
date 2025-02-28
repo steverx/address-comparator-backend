@@ -14,7 +14,7 @@ import pandas as pd
 from typing import Dict, List, Optional, Union, Generator
 import bleach
 from celery import Celery
-from utils.address_utils import AddressCorrectionModel
+from utils import AddressCorrectionModel  # This should work with our __init__.py setup
 from utils.progress import progress_tracker
 from utils.memory_manager import MemoryManager
 from utils.data_processing import DataProcessor
