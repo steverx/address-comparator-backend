@@ -6,13 +6,15 @@ FROM python:3.9-slim
 
 WORKDIR /app  # Set the working directory
 
-# Install system dependencies
+# Install system dependencies including build essentials for postal
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         nginx \
         ca-certificates \
         gosu \
         libpq-dev \
+        build-essential \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -34,6 +36,10 @@ ENV PORT=5000
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
+    ldconfig && \
+    # Install postal separately with specific flags
+    CFLAGS="-I${LIBPOSTAL_INCLUDE_DIR}" LDFLAGS="-L${LIBPOSTAL_LIB_DIR}" pip install --no-cache-dir postal && \
+    # Install the rest of requirements
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir gunicorn
 
