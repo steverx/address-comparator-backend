@@ -14,7 +14,6 @@ RUN apt-get update && \
         gosu \
         libpq-dev \
         curl \
-        build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -39,12 +38,9 @@ RUN ldconfig
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
-    # Try python-postal as an alternative
-    pip install --no-cache-dir https://github.com/openvenues/python-postal/archive/master.zip && \
+    # Skip python-postal installation
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir gunicorn requests flask
-
-# Rest of your Dockerfile remains the same...
 
 # Copy application code (with correct ownership)
 COPY --chown=appuser:appuser . .
