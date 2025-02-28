@@ -7,9 +7,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends grep && \
     rm -rf /var/lib/apt/lists/*
 
-# Install dependencies (filtering out postal)
+# Install dependencies (filtering out BOTH postal AND gunicorn)
 COPY requirements.txt .
-RUN grep -v "postal" requirements.txt > requirements_filtered.txt && \
+RUN grep -v -E "postal|gunicorn" requirements.txt > requirements_filtered.txt && \
     pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements_filtered.txt && \
     pip install --no-cache-dir waitress psutil
@@ -17,6 +17,6 @@ RUN grep -v "postal" requirements.txt > requirements_filtered.txt && \
 # Copy application code
 COPY . .
 
-# Simple, direct command using waitress
+# Explicitly set CMD to use python and wsgi.py
 ENV PORT=5000
 CMD ["python", "wsgi.py"]

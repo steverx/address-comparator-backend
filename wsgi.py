@@ -4,6 +4,15 @@ import logging
 import subprocess
 import psutil
 from waitress import serve
+import glob
+
+# Add at the top of wsgi.py
+print(f"Starting application with Waitress, PORT={os.environ.get('PORT', 5000)}")
+
+# Early debug log to find the issue
+print("Starting application...")
+print(f"Current directory: {os.getcwd()}")
+print(f"Files in directory: {os.listdir('.')}")
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -34,6 +43,17 @@ for root, dirs, files in os.walk('.'):
                         logger.warning(f"Content snippet: {content[:200]}...")
             except Exception as e:
                 logger.error(f"Error reading {path}: {e}")
+
+# Check for any scripts that might be invoking gunicorn
+for script_file in glob.glob("**/*.sh", recursive=True) + glob.glob("**/*.py", recursive=True):
+    try:
+        with open(script_file, 'r') as f:
+            content = f.read()
+            if 'gunicorn' in content and '--bind' in content:
+                print(f"WARNING: Found gunicorn --bind in: {script_file}")
+                print(f"Content: {content[:200]}...")
+    except Exception as e:
+        print(f"Error checking {script_file}: {e}")
 
 try:
     from app import create_app
