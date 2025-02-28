@@ -44,6 +44,9 @@ RUN grep -v "postal" requirements.txt > requirements_filtered.txt && \
     pip install --no-cache-dir -r requirements_filtered.txt && \
     pip install --no-cache-dir gunicorn requests flask
 
+# Insert in your Dockerfile where you install Python packages
+RUN pip install --no-cache-dir gunicorn
+
 # Copy application code (with correct ownership)
 COPY --chown=appuser:appuser . .
 
@@ -59,8 +62,10 @@ COPY --chown=www-data:www-data nginx.conf /etc/nginx/nginx.conf
 RUN mkdir -p /usr/share/nginx/html && \
     chown -R www-data:www-data /usr/share/nginx/html
 
-# Copy and set permissions for entrypoint script
-COPY --chown=root:root entrypoint.sh /entrypoint.sh
+# Copy the entrypoint script first
+COPY entrypoint.sh /entrypoint.sh
+
+# Set permissions explicitly in Docker
 RUN chmod +x /entrypoint.sh
 
 # Expose the port Nginx listens on
