@@ -1,11 +1,9 @@
 #!/bin/bash
-set -e
+# filepath: /C:/Users/Steven/Documents/projects/address-comparator-backend/entrypoint.sh
 
-# Start Nginx in the background
+# Start Nginx
 nginx -g "daemon on;"
 
-# Change to app directory
+# Start the Flask application
 cd /app
-
-# Start the Flask application with Gunicorn
-exec gunicorn --bind 0.0.0.0:${PORT} "app:create_app()"
+gunicorn --bind 0.0.0.0:${PORT} "app:create_app()"

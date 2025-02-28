@@ -44,7 +44,7 @@ RUN grep -v "postal" requirements.txt > requirements_filtered.txt && \
     pip install --no-cache-dir -r requirements_filtered.txt && \
     pip install --no-cache-dir gunicorn requests flask
 
-# Insert in your Dockerfile where you install Python packages
+# Ensure gunicorn is installed
 RUN pip install --no-cache-dir gunicorn
 
 # Copy application code (with correct ownership)
@@ -53,6 +53,10 @@ COPY --chown=appuser:appuser . .
 # Ensure Python module structure is correctly set up
 RUN mkdir -p utils api tasks && \
     touch utils/__init__.py api/__init__.py tasks/__init__.py
+
+# Explicitly create module directories if they don't exist
+RUN mkdir -p /app/api /app/config /app/utils /app/tasks /app/tests && \
+    touch /app/api/__init__.py /app/config/__init__.py /app/utils/__init__.py /app/tasks/__init__.py /app/tests/__init__.py
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -65,13 +69,17 @@ RUN mkdir -p /usr/share/nginx/html && \
 # Copy the entrypoint script first
 COPY entrypoint.sh /entrypoint.sh
 
+# Fix line endings for entrypoint script
+RUN sed -i 's/\r$//' /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
 # Set permissions explicitly in Docker
 RUN chmod +x /entrypoint.sh
 
 # Expose the port Nginx listens on
 EXPOSE 80
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
