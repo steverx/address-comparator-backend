@@ -47,6 +47,10 @@ RUN grep -v "postal" requirements.txt > requirements_filtered.txt && \
 # Copy application code (with correct ownership)
 COPY --chown=appuser:appuser . .
 
+# Ensure Python module structure is correctly set up
+RUN mkdir -p utils api tasks && \
+    touch utils/__init__.py api/__init__.py tasks/__init__.py
+
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 

@@ -8,6 +8,8 @@ from utils.address_utils import AddressCorrectionModel
 from utils.progress import progress_tracker
 from config.excel_config import EXCEL_CONFIG, ADDRESS_KEYWORDS  # Import config
 import os  # Import os
+import requests
+from werkzeug.datastructures import FileStorage
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,36 @@ class DataProcessor:
         self.chunk_size = chunk_size  # Or:  self.chunk_size = chunk_size if chunk_size else EXCEL_CONFIG['chunk_size']
         self.max_workers = max_workers  # Number of threads
         self.address_model = address_model or AddressCorrectionModel() # Use provided model or create one
+        self.allowed_extensions = {".csv", ".xlsx"}
+
+    def allowed_file(self, filename: str) -> bool:
+        """Check if file extension is allowed."""
+        return os.path.splitext(filename)[1].lower() in self.allowed_extensions
+
+    def load_dataframe(self, file_storage: FileStorage) -> pd.DataFrame:
+        """Load dataframe, handling different file types."""
+        try:
+            logger.info(f"Loading dataframe from file: {file_storage.filename}")
+            file_storage.seek(0)
+            if file_storage.filename.endswith(".csv"):
+                return pd.read_csv(file_storage)
+            elif file_storage.filename.endswith(".xlsx"):
+                return pd.read_excel(file_storage)
+            else:
+                raise ValueError(f"Unsupported file type: {file_storage.filename}")
+        except Exception as e:
+            logger.error(f"Error reading file {file_storage.filename}: {e}")
+            raise
+
+    def combine_address_components(self, row: pd.Series, columns: List[str]) -> str:
+        """Combine address components into a single string."""
+        components = []
+        for col in columns:
+            if pd.notna(row[col]):
+                val = str(row[col]).strip()
+                if val:
+                    components.append(val)
+        return ", ".join(components) if components else ""
 
     def process_dataframe_in_chunks(self,
                                   df: pd.DataFrame,
@@ -150,3 +182,40 @@ class DataProcessor:
         except Exception as e:
             logger.exception(f"Error loading file {file.filename}:")
             raise
+
+    def parse_address(self, address):
+        """Parse address using libpostal REST API."""
+        try:
+            response = requests.post(
+                'http://localhost:8080/parser',
+                json={'query': address}
+            )
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error parsing address: {e}")
+            return {}
+
+    def expand_address(self, address):
+        """Expand address using libpostal REST API."""
+        try:
+            response = requests.post(
+                'http://localhost:8080/expand',
+                json={'query': address}
+            )
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error expanding address: {e}")
+            return []
+
+    def normalize_address(self, address):
+        """Normalize address using libpostal."""
+        parsed = self.parse_address(address)
+        # Format the parsed address based on your requirements
+        # This is a placeholder - implement your logic here
+        return address  # Return original for now
+
+    def compare_addresses(self, df1, df2, columns1, columns2, threshold):
+        """Compare addresses between two dataframes."""
+        # Implementation details depend on your specific comparison logic
+        # This is where you'd put the bulk of your address comparison code
+        pass
