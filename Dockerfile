@@ -38,8 +38,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
     ldconfig && \
-    # Install older version of postal that's compatible with your libpostal
-    CFLAGS="-I${LIBPOSTAL_INCLUDE_DIR}" LDFLAGS="-L${LIBPOSTAL_LIB_DIR}" pip install --no-cache-dir postal==1.1.9 && \
+    git clone https://github.com/openvenues/pypostal && \
+    cd pypostal && \
+    CFLAGS="-I${LIBPOSTAL_INCLUDE_DIR}" LDFLAGS="-L${LIBPOSTAL_LIB_DIR}" pip install . && \
+    cd .. && \
+    rm -rf pypostal && \
     # Install the rest of requirements
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir gunicorn
