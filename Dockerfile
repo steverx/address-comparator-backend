@@ -1,27 +1,6 @@
 # Use a consistent name for the builder stage
 FROM steverx/libpostal-builder:latest as libpostal-builder
 
-# --- Go Builder Stage ---
-FROM golang:1.20 as go-builder
-
-# Copy libpostal files from the first builder stage
-COPY --from=libpostal-builder /usr/local/lib/libpostal.so* /usr/local/lib/
-COPY --from=libpostal-builder /usr/local/include/libpostal/ /usr/local/include/libpostal/
-COPY --from=libpostal-builder /usr/local/data/ /usr/local/data/
-
-# Set environment variables for build
-ENV LIBPOSTAL_INCLUDE_DIR=/usr/local/include
-ENV LIBPOSTAL_LIB_DIR=/usr/local/lib
-ENV LIBPOSTAL_DATA_DIR=/usr/local/data
-ENV LD_LIBRARY_PATH="${LIBPOSTAL_LIB_DIR}:${LD_LIBRARY_PATH}"
-ENV CGO_ENABLED=1
-ENV GOOS=linux
-ENV GOARCH=amd64
-
-# Build the gopostal binary
-RUN go install github.com/openvenues/gopostal/cmd/postal-rest@latest && \
-    ldconfig
-
 # --- Final Backend Image ---
 FROM python:3.9-slim
 
@@ -35,6 +14,7 @@ RUN apt-get update && \
         gosu \
         libpq-dev \
         curl \
+        build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -45,16 +25,12 @@ COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/lib/libpostal.s
 COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/include/libpostal/ /usr/local/include/libpostal/
 COPY --from=libpostal-builder --chown=appuser:appuser /usr/local/data/ /usr/local/data/
 
-# Copy the built postal-rest binary
-COPY --from=go-builder --chown=root:root /go/bin/postal-rest /usr/local/bin/
-
 # Set environment variables
 ENV LIBPOSTAL_INCLUDE_DIR=/usr/local/include
 ENV LIBPOSTAL_LIB_DIR=/usr/local/lib
 ENV LIBPOSTAL_DATA_DIR=/usr/local/data
 ENV LD_LIBRARY_PATH="${LIBPOSTAL_LIB_DIR}:${LD_LIBRARY_PATH}"
 ENV PORT=5000
-ENV POSTAL_PORT=8080
 
 # Run ldconfig to update shared libraries
 RUN ldconfig
@@ -63,8 +39,12 @@ RUN ldconfig
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
+    # Try python-postal as an alternative
+    pip install --no-cache-dir https://github.com/openvenues/python-postal/archive/master.zip && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir gunicorn requests
+    pip install --no-cache-dir gunicorn requests flask
+
+# Rest of your Dockerfile remains the same...
 
 # Copy application code (with correct ownership)
 COPY --chown=appuser:appuser . .
