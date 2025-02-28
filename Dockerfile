@@ -41,11 +41,10 @@ COPY requirements.txt .
 RUN grep -v "postal" requirements.txt > requirements_filtered.txt && \
     pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
-    pip install --no-cache-dir -r requirements_filtered.txt && \
-    pip install --no-cache-dir gunicorn requests flask
+    pip install --no-cache-dir -r requirements_filtered.txt
 
-# Ensure gunicorn is installed
-RUN pip install --no-cache-dir gunicorn
+# Install waitress instead of gunicorn
+RUN pip install --no-cache-dir waitress requests flask
 
 # Copy application code (with correct ownership)
 COPY --chown=appuser:appuser . .
@@ -61,27 +60,5 @@ RUN mkdir -p /app/api /app/config /app/utils /app/tasks /app/tests && \
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Configure nginx
-COPY --chown=www-data:www-data nginx.conf /etc/nginx/nginx.conf
-RUN mkdir -p /usr/share/nginx/html && \
-    chown -R www-data:www-data /usr/share/nginx/html
-
-# Copy the entrypoint script first
-COPY entrypoint.sh /entrypoint.sh
-
-# Fix line endings for entrypoint script
-RUN sed -i 's/\r$//' /entrypoint.sh && \
-    chmod +x /entrypoint.sh
-
-# Set permissions explicitly in Docker
-RUN chmod +x /entrypoint.sh
-
-# Expose the port Nginx listens on
-EXPOSE 80
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/health || exit 1
-
-# Use this instead
-ENTRYPOINT ["sh", "-c", "nginx -g 'daemon on;' && cd /app && gunicorn --bind 0.0.0.0:${PORT} 'app:create_app()'"]
+# Use waitress instead of gunicorn
+CMD sh -c "nginx -g 'daemon on;' && cd /app && python -m waitress --port=${PORT} --call app:create_app"
