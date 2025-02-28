@@ -14,6 +14,7 @@ RUN apt-get update && \
         gosu \
         libpq-dev \
         curl \
+        grep \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -36,10 +37,11 @@ RUN ldconfig
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
+# Create a filtered requirements file without postal
+RUN grep -v "postal" requirements.txt > requirements_filtered.txt && \
+    pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
-    # Skip python-postal installation
-    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements_filtered.txt && \
     pip install --no-cache-dir gunicorn requests flask
 
 # Copy application code (with correct ownership)
