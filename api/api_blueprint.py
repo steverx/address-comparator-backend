@@ -449,8 +449,34 @@ def register_api_blueprint(app):
         """Health check endpoint."""
         return jsonify({"status": "healthy"}), 200
     
-    # Add more endpoints here
-    # ...
+    @api_bp.route("/columns", methods=["POST"])
+    def get_columns():
+        """Get columns from uploaded file."""
+        try:
+            if "file" not in request.files:
+                return jsonify({"error": "No file provided"}), 400
+                
+            file = request.files["file"]
+            if not file or not file.filename:
+                return jsonify({"error": "Invalid file"}), 400
+                
+            # Simple file loading
+            if file.filename.endswith('.csv'):
+                df = pd.read_csv(file)
+            elif file.filename.endswith('.xlsx'):
+                df = pd.read_excel(file)
+            else:
+                return jsonify({"error": "Unsupported file type"}), 400
+                
+            columns = df.columns.tolist()
+            
+            return jsonify({"status": "success", "data": columns}), 200
+            
+        except Exception as e:
+            logger.exception("Error processing columns")
+            return jsonify({"status": "error", "error": str(e)}), 500
+    
+    # Add validate and compare endpoints here too...
     
     # Register the blueprint with the app
     app.register_blueprint(api_bp)
