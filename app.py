@@ -580,9 +580,25 @@ if __name__ == "__main__":
         sys.exit(1)
 
 def parse_address(address):
-    response = requests.post('http://localhost:8080/parser', json={'query': address})
-    return response.json()
+    """Parse address using libpostal REST API."""
+    try:
+        response = requests.post(
+            'http://localhost:8080/parser',
+            json={'query': address}
+        )
+        return response.json()
+    except Exception as e:
+        print(f"Error parsing address: {e}")
+        return {}
 
 def expand_address(address):
-    response = requests.post('http://localhost:8080/expand', json={'query': address})
-    return response.json()
+    """Expand address using libpostal REST API."""
+    try:
+        response = requests.post(
+            'http://localhost:8080/expand',
+            json={'query': address}
+        )
+        return response.json()
+    except Exception as e:
+        print(f"Error expanding address: {e}")
+        return []

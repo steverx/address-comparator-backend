@@ -16,7 +16,7 @@ RUN apt-get update && \
         build-essential \
         git \
         curl \
-        golang \
+        wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -34,16 +34,13 @@ ENV LIBPOSTAL_DATA_DIR=/usr/local/data
 ENV LD_LIBRARY_PATH="${LIBPOSTAL_LIB_DIR}:${LD_LIBRARY_PATH}"
 ENV PORT=5000
 ENV POSTAL_PORT=8080
-ENV GO111MODULE=on
-ENV GOPATH=/go
 
-# Install gopostal (REST API for libpostal)
-RUN mkdir -p /go && \
-    go install github.com/openvenues/gopostal/cmd/postal-rest@latest && \
-    mv /go/bin/postal-rest /usr/local/bin/ && \
+# Download pre-compiled postal-rest binary instead of building it
+RUN wget -O /usr/local/bin/postal-rest https://github.com/openvenues/gopostal/releases/download/v1.0.0/postal-rest.linux-amd64 && \
+    chmod +x /usr/local/bin/postal-rest && \
     ldconfig
 
-# Copy requirements and install Python dependencies (without pypostal)
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir setuptools wheel && \
