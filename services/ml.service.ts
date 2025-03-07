@@ -3,8 +3,8 @@ import { cosineSimilarity } from '../utils/similarity';
 
 export class AddressMatcher {
     private static instance: AddressMatcher;
-    private vectorizer: TfidfVectorizer;
-    private addressVectors: number[][];
+    private vectorizer!: TfidfVectorizer;
+    private addressVectors: number[][] = [];
 
     static async getInstance(): Promise<AddressMatcher> {
         if (!AddressMatcher.instance) {

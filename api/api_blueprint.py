@@ -11,12 +11,13 @@ import pandas as pd
 import json
 import uuid
 from utils.progress import progress_tracker
+import os
 
 logger = logging.getLogger(__name__)
 F = TypeVar('F', bound=Callable[..., Any])  # For function type annotations
 
 # Create blueprint
-api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
+api_bp = Blueprint('api', __name__, url_prefix='/api/v1')  # ADD THIS LINE
 
 # ============ Error Handling ============
 
@@ -334,63 +335,34 @@ def get_columns():
 
 @api_route('/compare', methods=['POST'])
 def compare_addresses():
+    """Compare addresses from uploaded file to database."""
     try:
-        logger.info("Received address comparison request")
-        
-        # Validate files in request
-        if 'file1' not in request.files or 'file2' not in request.files:
-            logger.warning("Missing file(s) in request")
-            return jsonify({'status': 'error', 'error': 'Missing file(s)'}), 400
+        # Check if file exists in request
+        if "file" not in request.files:
+            return jsonify({"status": "error", "error": "No file provided"}), 400
             
-        file1 = request.files['file1']
-        file2 = request.files['file2']
-        logger.info(f"Uploaded files: {file1.filename}, {file2.filename}")
+        file = request.files["file"]
+        if not file or not file.filename:
+            return jsonify({"status": "error", "error": "Invalid file"}), 400
         
-        # Generate a unique job ID
-        job_id = str(uuid.uuid4())
-        progress_tracker.update_progress(
-            job_id, {"status": "started", "progress": 0}
-        )
+        # Get columns from form data
+        columns = request.form.getlist("columns[]") or []
+        if not columns:
+            columns = json.loads(request.form.get("columns", "[]"))
         
-        # Validate request data
-        if not current_app.data_processor.allowed_file(file1.filename) or not current_app.data_processor.allowed_file(file2.filename):
-            return jsonify({"status": "error", "error": "Invalid file type"}), 400
-            
-        # Get column selections
-        columns1 = request.form.getlist('columns1[]')
-        columns2 = request.form.getlist('columns2[]')
+        # Get threshold (default 80%)
+        threshold = float(request.form.get("threshold", "0.8"))
         
-        if not columns1 or not columns2:
-            return jsonify({"status": "error", "error": "Column selections are required"}), 400
-            
-        # Get threshold
-        threshold_str = request.form.get("threshold", str(current_app.config["DEFAULT_THRESHOLD"]))
-        try:
-            threshold = float(threshold_str) / 100
-            if not 0 <= threshold <= 1:
-                raise ValueError("Threshold must be between 0 and 100")
-        except ValueError:
-            logger.warning(f"Invalid threshold value: {threshold_str}")
-            return jsonify({'status': 'error', 'error': 'Invalid threshold value'}), 400
-            
-        # Load dataframes
-        df1 = current_app.data_processor.load_dataframe(file1)
-        df2 = current_app.data_processor.load_dataframe(file2)
+        # Load dataframe using data processor
+        df = current_app.data_processor.load_dataframe(file)
         
-        # Submit task to Celery if available
-        if hasattr(current_app, 'celery'):
-            from tasks.comparison_tasks import process_address_comparison_task
-            task = process_address_comparison_task.delay(
-                df1.to_dict(), df2.to_dict(), columns1, columns2, threshold, job_id
-            )
-            return jsonify({"status": "success", "job_id": job_id, "task_id": task.id}), 200
-        else:
-            # Synchronous processing (fallback if Celery not available)
-            results = current_app.data_processor.compare_addresses(df1, df2, columns1, columns2, threshold)
-            return jsonify({"status": "success", "data": results}), 200
-            
+        # Process comparison against database
+        results = current_app.data_processor.compare_addresses(df, columns, threshold)
+        
+        return {"data": results}, 200
+        
     except Exception as e:
-        logger.exception("Error processing comparison request:")
+        logger.exception("Error processing address comparison")
         return jsonify({"status": "error", "error": str(e)}), 500
 
 
@@ -424,59 +396,13 @@ def validate_address():
 
 
 def register_api_blueprint(app):
-    """Register API routes with Flask app."""
-    
-    # Create a blueprint
-    api_bp = Blueprint('api', __name__)
-    
-    @api_bp.route("/")
-    def index():
-        """Root endpoint."""
-        return jsonify({
-            "status": "running",
-            "version": "1.0",
-            "endpoints": {
-                "health": "/health",
-                "columns": "/columns",
-                "compare": "/compare",
-                "validate": "/validate",
-            },
-            "timestamp": datetime.datetime.utcnow().isoformat()
-        }), 200
-    
-    @api_bp.route("/health")
-    def health_check():
-        """Health check endpoint."""
-        return jsonify({"status": "healthy"}), 200
-    
-    @api_bp.route("/columns", methods=["POST"])
-    def get_columns():
-        """Get columns from uploaded file."""
-        try:
-            if "file" not in request.files:
-                return jsonify({"error": "No file provided"}), 400
-                
-            file = request.files["file"]
-            if not file or not file.filename:
-                return jsonify({"error": "Invalid file"}), 400
-                
-            # Simple file loading
-            if file.filename.endswith('.csv'):
-                df = pd.read_csv(file)
-            elif file.filename.endswith('.xlsx'):
-                df = pd.read_excel(file)
-            else:
-                return jsonify({"error": "Unsupported file type"}), 400
-                
-            columns = df.columns.tolist()
-            
-            return jsonify({"status": "success", "data": columns}), 200
-            
-        except Exception as e:
-            logger.exception("Error processing columns")
-            return jsonify({"status": "error", "error": str(e)}), 500
-    
-    # Add validate and compare endpoints here too...
+    # Configure CORS
+    from flask_cors import CORS
+    CORS(app, resources={r"/api/*": {
+        "origins": os.environ.get('ALLOWED_ORIGINS', '*').split(','),
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }})
     
     # Register the blueprint with the app
     app.register_blueprint(api_bp)

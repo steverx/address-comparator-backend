@@ -185,7 +185,7 @@ class EnhancedAddressValidator:
                         'has_zip': False
                     }
                 
-                # Instead of using libpostal, add advanced text analysis features
+                # Instead of using libpostal, add advanced text analysis features 
                 norm_address = self.normalize_address(address)
                 advanced_features = {
                     'has_valid_format': bool(re.search(r'\d+\s+[\w\s]+,\s+[\w\s]+,\s+[A-Z]{2}\s+\d{5}', address, re.IGNORECASE)),

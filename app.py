@@ -145,17 +145,11 @@ def create_app(config=None):
             app.config.update(config)
 
         # Configure CORS
-        CORS(
-            app,
-            resources={
-                r"/*": {
-                    "origins": app.config['ALLOWED_ORIGINS'],
-                    "methods": ["GET", "POST", "OPTIONS"],
-                    "allow_headers": ["Content-Type", "Authorization"],
-                    "supports_credentials": True,
-                }
-            },
-        )
+        CORS(app, resources={r"/api/*": {
+            "origins": ["https://address-comparator-frontend-production.up.railway.app"],
+            "methods": ["GET", "POST", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }})
 
         # Initialize memory manager
         app.memory_manager = MemoryManager(enable_tracemalloc=app.config['DEBUG'])

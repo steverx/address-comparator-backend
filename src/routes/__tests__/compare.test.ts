@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { compareAddresses } from '../compare';
+import compareAddresses from '../compare';
 import { findAddressMatches } from '../../services/database.service';
 import { AddressMatch } from '../../types/address';
 import { createMockRequest, createMockResponse } from '../../test/helpers';
@@ -36,7 +36,7 @@ describe('Compare Addresses Endpoint', () => {
 
     (findAddressMatches as jest.Mock).mockResolvedValueOnce(mockMatches);
 
-    await compareAddresses(mockRequest as Request, mockResponse as Response);
+    await compareAddresses(mockRequest as Request, mockResponse as Response, jest.fn());
 
     expect(responseObject).toEqual({
       status: 'success',
@@ -50,7 +50,7 @@ describe('Compare Addresses Endpoint', () => {
   test('should handle no matches found', async () => {
     (findAddressMatches as jest.Mock).mockResolvedValueOnce([]);
 
-    await compareAddresses(mockRequest as Request, mockResponse as Response);
+    await compareAddresses(mockRequest as Request, mockResponse as Response, jest.fn());
 
     expect(responseObject).toEqual({
       status: 'success',
@@ -76,7 +76,7 @@ describe('Compare Addresses Endpoint', () => {
 
     (findAddressMatches as jest.Mock).mockResolvedValueOnce(mockMatches);
 
-    await compareAddresses(mockRequest as Request, mockResponse as Response);
+    await compareAddresses(mockRequest as Request, mockResponse as Response, jest.fn());
 
     expect(responseObject).toEqual({
       status: 'success',
@@ -93,7 +93,7 @@ describe('Compare Addresses Endpoint', () => {
 
     (findAddressMatches as jest.Mock).mockResolvedValueOnce(mockMatches);
 
-    await compareAddresses(mockRequest as Request, mockResponse as Response);
+    await compareAddresses(mockRequest as Request, mockResponse as Response, jest.fn());
 
     expect(responseObject).toEqual({
       status: 'success',
